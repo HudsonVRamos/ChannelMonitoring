@@ -15,6 +15,10 @@ WidevinePoCStack(
     f"{project_name}-stack",
     project_name=project_name,
     description="Infraestrutura para PoC de validação Widevine DRM com Playwright",
+    env=cdk.Environment(
+        account="761018874615",
+        region="us-east-1",
+    ),
 )
 
 app.synth()

@@ -90,7 +90,7 @@ class WidevinePoCStack(Stack):
         artifacts_bucket = s3.Bucket(
             self,
             "ArtifactsBucket",
-            bucket_name=f"{project_name}-artifacts-{self.account}",
+            bucket_name=f"{project_name}-artifacts-{self.region}-{self.account}",
             removal_policy=RemovalPolicy.RETAIN,
             auto_delete_objects=False,
             versioned=True,

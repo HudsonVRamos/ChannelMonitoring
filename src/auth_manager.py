@@ -17,7 +17,7 @@ from src.models import SessionResult, StorageStateResult
 from src.structured_logger import StructuredLogger
 
 # Padrões de URL que indicam redirecionamento para login
-_LOGIN_PATTERNS: list[str] = ["login", "signin", "auth"]
+_LOGIN_PATTERNS: list[str] = ["login", "signin", "auth", "acessar"]
 
 # Timeout padrão para restauração de sessão (segundos)
 _DEFAULT_SESSION_TIMEOUT: int = 15
