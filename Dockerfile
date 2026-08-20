@@ -18,6 +18,7 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # Código da PoC
 COPY src/ /app/src/
+COPY scripts/ /app/scripts/
 WORKDIR /app
 
 # Instalar browsers com Widevine CDM
