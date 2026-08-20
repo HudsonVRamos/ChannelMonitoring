@@ -24,12 +24,15 @@ phases:
       - echo "=== Executando PoC dentro do container Docker ==="
       - mkdir -p output
       - |
-        docker run --rm \
+        timeout 300 docker run --rm \
           --shm-size=2g \
           -e POC_CHANNEL_URL="${POC_CHANNEL_URL}" \
           -e POC_LOG_LEVEL="${POC_LOG_LEVEL}" \
           -e POC_STORAGE_STATE_PATH="/app/storage_state/state.json" \
           -e POC_OUTPUT_DIR="/app/output" \
+          -e POC_DRM_TIMEOUT="30" \
+          -e POC_TELEMETRY_DURATION="10" \
+          -e POC_PLAYBACK_TIMEOUT="30" \
           -e AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
           -e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
           -e AWS_SESSION_TOKEN="${AWS_SESSION_TOKEN}" \
