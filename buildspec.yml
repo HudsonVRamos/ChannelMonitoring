@@ -6,6 +6,7 @@ env:
     POC_LOG_LEVEL: "/widevine-poc/log-level"
   variables:
     POC_OUTPUT_DIR: "./output"
+    POC_STORAGE_STATE_PATH: "storage_state/state.json"
     ARTIFACTS_BUCKET: "widevine-poc-artifacts-us-east-1-761018874615"
 
 phases:
@@ -31,7 +32,7 @@ phases:
       - echo "=== Baixando storageState do S3 ==="
       - mkdir -p storage_state
       - aws s3 cp s3://${ARTIFACTS_BUCKET}/storage_state/state.json storage_state/state.json
-      - export POC_STORAGE_STATE_PATH="storage_state/state.json"
+      - echo "StorageState size:" && wc -c storage_state/state.json
       - echo "=== Executando testes unitários ==="
       - python -m pytest tests/ --tb=short -q --ignore=tests/test_poc_orchestrator.py
       - echo "=== Testes OK ==="
@@ -42,14 +43,12 @@ phases:
       - Xvfb :99 -screen 0 1920x1080x24 &
       - export DISPLAY=:99
       - sleep 2
-      - echo "=== Verificando Chrome + Widevine ==="
-      - google-chrome --headless --no-sandbox --dump-dom "chrome://settings" 2>&1 | head -5 || true
+      - echo "=== Config ==="
+      - echo "POC_STORAGE_STATE_PATH=${POC_STORAGE_STATE_PATH}"
+      - echo "POC_CHANNEL_URL=${POC_CHANNEL_URL}"
+      - ls -la storage_state/state.json
       - echo "=== Executando PoC com Google Chrome + Xvfb ==="
       - mkdir -p output
-      - export POC_STORAGE_STATE_PATH="storage_state/state.json"
-      - export POC_DRM_TIMEOUT="60"
-      - export POC_TELEMETRY_DURATION="10"
-      - export POC_PLAYBACK_TIMEOUT="60"
       - timeout 180 python -m src || true
       - echo "=== PoC finalizada ==="
 

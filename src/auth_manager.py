@@ -226,6 +226,36 @@ class AuthManager:
             # Se não conseguir avaliar, verificar apenas pela URL
             pass
 
+        # Verificar conteúdo da página: formulários de login,
+        # inputs de email/senha indicam que não está logado
+        try:
+            has_login_form = await page.evaluate(
+                """() => {
+                    const inputs = document.querySelectorAll(
+                        'input[type="email"], input[type="password"], '
+                        + 'input[name="email"], input[name="password"], '
+                        + 'input[name="username"], input[name="login"]'
+                    );
+                    const loginBtns = document.querySelectorAll(
+                        'button[type="submit"], '
+                        + 'button:has-text("Entrar"), '
+                        + 'button:has-text("Login"), '
+                        + 'a:has-text("Entrar")'
+                    );
+                    return inputs.length > 0 || loginBtns.length > 0;
+                }"""
+            )
+            if has_login_form:
+                self._logger.error(
+                    "auth",
+                    "Sessão expirada: formulário de login "
+                    "detectado na página",
+                    url=page.url,
+                )
+                return True
+        except Exception:
+            pass
+
         return False
 
     async def restore_session(

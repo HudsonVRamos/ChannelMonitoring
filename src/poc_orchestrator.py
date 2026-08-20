@@ -170,6 +170,18 @@ class PoCOrchestrator:
                     )
                     else None
                 )
+                self._logger.info(
+                    STAGE_ID,
+                    "Criando contexto com storageState",
+                    storage_state_path=(
+                        self._config.storage_state_path
+                    ),
+                    file_exists=os.path.exists(
+                        self._config.storage_state_path
+                    ),
+                    resolved_path=storage_path,
+                    cwd=os.getcwd(),
+                )
                 self._context = (
                     await self._browser.new_context(
                         storage_state=storage_path,
