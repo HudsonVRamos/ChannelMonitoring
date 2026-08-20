@@ -9,43 +9,54 @@ env:
     ARTIFACTS_BUCKET: "widevine-poc-artifacts-us-east-1-761018874615"
 
 phases:
+  install:
+    runtime-versions:
+      python: 3.11
+    commands:
+      - echo "=== Instalando Google Chrome (com Widevine CDM) ==="
+      - wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+      - dpkg -i google-chrome-stable_current_amd64.deb || apt-get -fy install
+      - rm google-chrome-stable_current_amd64.deb
+      - google-chrome --version
+      - echo "=== Instalando Xvfb (display virtual) ==="
+      - apt-get update -qq && apt-get install -y -qq xvfb
+      - echo "=== Instalando dependências Python ==="
+      - pip install --quiet -r requirements.txt
+      - echo "=== Instalando Playwright (sem browsers — usaremos Chrome do sistema) ==="
+      - pip install --quiet playwright
+      - echo "=== Install completo ==="
+
   pre_build:
     commands:
       - echo "=== Baixando storageState do S3 ==="
       - mkdir -p storage_state
       - aws s3 cp s3://${ARTIFACTS_BUCKET}/storage_state/state.json storage_state/state.json
-      - echo "=== Construindo imagem Docker com Playwright + Widevine ==="
-      - docker build -t widevine-poc .
+      - export POC_STORAGE_STATE_PATH="storage_state/state.json"
+      - echo "=== Executando testes unitários ==="
+      - python -m pytest tests/ --tb=short -q --ignore=tests/test_poc_orchestrator.py
+      - echo "=== Testes OK ==="
 
   build:
     commands:
-      - echo "=== Verificando Widevine CDM no container ==="
-      - docker run --rm --shm-size=2g widevine-poc --help || true
-      - echo "=== Executando PoC dentro do container Docker ==="
+      - echo "=== Iniciando Xvfb ==="
+      - Xvfb :99 -screen 0 1920x1080x24 &
+      - export DISPLAY=:99
+      - sleep 2
+      - echo "=== Verificando Chrome + Widevine ==="
+      - google-chrome --headless --no-sandbox --dump-dom "chrome://settings" 2>&1 | head -5 || true
+      - echo "=== Executando PoC com Google Chrome + Xvfb ==="
       - mkdir -p output
-      - |
-        timeout --signal=KILL 180 docker run --rm \
-          --shm-size=2g \
-          -e POC_CHANNEL_URL="${POC_CHANNEL_URL}" \
-          -e POC_LOG_LEVEL="DEBUG" \
-          -e POC_STORAGE_STATE_PATH="/app/storage_state/state.json" \
-          -e POC_OUTPUT_DIR="/app/output" \
-          -e POC_DRM_TIMEOUT="60" \
-          -e POC_TELEMETRY_DURATION="10" \
-          -e POC_PLAYBACK_TIMEOUT="60" \
-          -e AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
-          -e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
-          -e AWS_SESSION_TOKEN="${AWS_SESSION_TOKEN}" \
-          -e AWS_DEFAULT_REGION="us-east-1" \
-          -v "$(pwd)/storage_state:/app/storage_state:ro" \
-          -v "$(pwd)/output:/app/output" \
-          widevine-poc || true
+      - export POC_STORAGE_STATE_PATH="storage_state/state.json"
+      - export POC_DRM_TIMEOUT="60"
+      - export POC_TELEMETRY_DURATION="10"
+      - export POC_PLAYBACK_TIMEOUT="60"
+      - timeout 180 python -m src || true
       - echo "=== PoC finalizada ==="
 
   post_build:
     commands:
       - echo "=== Relatório ==="
-      - cat output/poc_report.json || echo "Relatório não encontrado"
+      - cat output/poc_report.json || echo "Relatório não gerado (timeout ou erro)"
       - aws s3 sync output/ s3://${ARTIFACTS_BUCKET}/output/$(date +%Y%m%d-%H%M%S)/ || true
 
 artifacts:
