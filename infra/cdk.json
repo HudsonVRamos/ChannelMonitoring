@@ -1,0 +1,10 @@
+{
+  "app": "python app.py",
+  "context": {
+    "project_name": "widevine-poc",
+    "env": {
+      "account": "",
+      "region": "us-east-1"
+    }
+  }
+}

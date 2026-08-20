@@ -1,0 +1,17 @@
+# Widevine PoC - Dependências
+# Automação de browser com suporte a Widevine DRM
+playwright==1.40.0
+
+# Análise visual de frames
+opencv-python-headless==4.9.0.80
+numpy==1.26.4
+
+# Integração com Amazon Bedrock
+boto3==1.34.69
+
+# Framework de testes
+pytest==8.1.1
+pytest-asyncio==0.23.5
+
+# Property-based testing
+hypothesis==6.99.13

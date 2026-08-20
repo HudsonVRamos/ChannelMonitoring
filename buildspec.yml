@@ -1,0 +1,59 @@
+version: 0.2
+
+env:
+  parameter-store:
+    POC_CHANNEL_URL: "/widevine-poc/channel-url"
+    POC_STORAGE_STATE_PATH: "/widevine-poc/storage-state-path"
+    POC_LOG_LEVEL: "/widevine-poc/log-level"
+  variables:
+    POC_OUTPUT_DIR: "./output"
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.11
+    commands:
+      - echo "=== Instalando dependências de sistema para Widevine ==="
+      - apt-get update -qq
+      - apt-get install -y -qq libnss3 libatk1.0-0 libatk-bridge2.0-0 libgbm1 libasound2 libxrandr2 libpango-1.0-0 libcairo2
+      - echo "=== Instalando dependências Python ==="
+      - pip install --quiet -r requirements.txt
+      - echo "=== Instalando Chromium com Widevine ==="
+      - playwright install chromium
+      - playwright install-deps chromium
+
+  pre_build:
+    commands:
+      - echo "=== Baixando storageState do S3 ==="
+      - mkdir -p storage_state
+      - aws s3 cp s3://${ARTIFACTS_BUCKET}/storage_state/state.json storage_state/state.json || echo "WARN - storageState não encontrado no S3"
+      - export POC_STORAGE_STATE_PATH="storage_state/state.json"
+      - echo "=== Executando testes unitários ==="
+      - python -m pytest tests/ --tb=short -q --ignore=tests/test_poc_orchestrator.py
+      - echo "=== Testes OK ==="
+
+  build:
+    commands:
+      - echo "=== Iniciando PoC Widevine ==="
+      - mkdir -p output
+      - python -m src
+      - echo "=== PoC finalizada ==="
+
+  post_build:
+    commands:
+      - echo "=== Relatório gerado ==="
+      - cat output/poc_report.json || echo "Relatório não encontrado"
+      - echo "=== Uploading artefatos para S3 ==="
+      - aws s3 sync output/ s3://${ARTIFACTS_BUCKET}/output/$(date +%Y%m%d-%H%M%S)/ || true
+      - echo "=== Build concluído ==="
+
+artifacts:
+  files:
+    - output/**/*
+  name: widevine-poc-results
+  discard-paths: no
+
+cache:
+  paths:
+    - '/root/.cache/pip/**/*'
+    - '/root/.cache/ms-playwright/**/*'

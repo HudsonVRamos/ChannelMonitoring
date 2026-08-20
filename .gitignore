@@ -1,0 +1,39 @@
+# Variáveis de ambiente com secrets
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Pytest
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Hypothesis
+.hypothesis/
+
+# Storage state (contém sessão autenticada)
+storage_state/*.json
+
+# Output de execução
+output/*.json
+output/*.png
+output/*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Virtual environment
+venv/
+.venv/
+
+# CDK
+infra/cdk.out/
+infra/.cdk.staging/

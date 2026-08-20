@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  widevine-poc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: widevine-poc
+    env_file:
+      - .env
+    environment:
+      - POC_STORAGE_STATE_PATH=/app/storage_state/state.json
+      - POC_CHANNEL_URL=${POC_CHANNEL_URL:-https://www.skyplus.com.br}
+      - POC_LOG_LEVEL=${POC_LOG_LEVEL:-INFO}
+      - POC_OUTPUT_DIR=/app/output
+    volumes:
+      - ./storage_state:/app/storage_state
+      - ./output:/app/output
+    shm_size: "2gb"
