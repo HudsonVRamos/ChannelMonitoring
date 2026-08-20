@@ -192,9 +192,19 @@ class PoCOrchestrator:
                 if auth_passed:
                     await self._try_start_playback()
 
+                # === Capturar screenshot para diagnóstico ===
+                if auth_passed:
+                    await self._capture_diagnostic_screenshot(
+                        "before_drm"
+                    )
+
                 # === Validação DRM ===
                 if auth_passed:
                     drm_result = await self._validate_drm()
+                    # Screenshot após DRM (para ver estado do player)
+                    await self._capture_diagnostic_screenshot(
+                        "after_drm"
+                    )
                     results.append(drm_result)
                     drm_passed = (
                         drm_result.status == ValidationStatus.PASS
@@ -1049,6 +1059,36 @@ class PoCOrchestrator:
             now.strftime("%Y-%m-%dT%H:%M:%S.")
             + f"{now.microsecond // 1000:03d}Z"
         )
+
+    async def _capture_diagnostic_screenshot(
+        self, label: str
+    ) -> None:
+        """Captura screenshot para diagnóstico e salva no output.
+
+        Args:
+            label: Nome descritivo para o arquivo (ex: "before_drm").
+        """
+        if self._page is None:
+            return
+
+        try:
+            output_dir = self._config.output_dir
+            os.makedirs(output_dir, exist_ok=True)
+            path = os.path.join(
+                output_dir, f"screenshot_{label}.png"
+            )
+            await self._page.screenshot(path=path)
+            self._logger.info(
+                STAGE_ID,
+                f"Screenshot de diagnóstico capturado: {label}",
+                path=path,
+            )
+        except Exception as e:
+            self._logger.warning(
+                STAGE_ID,
+                f"Falha ao capturar screenshot: {label}",
+                error=str(e),
+            )
 
     def _skipped_result(
         self, name: str, reason: str

@@ -57,6 +57,8 @@ phases:
     commands:
       - echo "=== Relatório ==="
       - cat output/poc_report.json || echo "Relatório não gerado (timeout ou erro)"
+      - echo "=== Screenshots de diagnóstico ==="
+      - ls -la output/screenshot_*.png 2>/dev/null || echo "Nenhum screenshot encontrado"
       - aws s3 sync output/ s3://${ARTIFACTS_BUCKET}/output/$(date +%Y%m%d-%H%M%S)/ || true
 
 artifacts:
