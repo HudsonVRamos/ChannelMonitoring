@@ -139,9 +139,10 @@ class PoCOrchestrator:
 
         async with async_playwright() as p:
             try:
-                # Inicializar browser com Widevine
+                # Inicializar browser com Widevine (Google Chrome com CDM built-in)
                 browser_start = time.perf_counter()
                 self._browser = await p.chromium.launch(
+                    channel="chrome",
                     headless=False,
                     args=[
                         "--autoplay-policy="

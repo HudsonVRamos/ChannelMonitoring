@@ -11,7 +11,13 @@ RUN apt-get update && apt-get install -y \
     libpango-1.0-0 \
     libcairo2 \
     xvfb \
+    wget \
     && rm -rf /var/lib/apt/lists/*
+
+# Instalar Google Chrome (tem Widevine CDM built-in)
+RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
+    && dpkg -i google-chrome-stable_current_amd64.deb || apt-get -fy install \
+    && rm google-chrome-stable_current_amd64.deb
 
 # Dependências Python
 COPY requirements.txt /app/requirements.txt
@@ -21,9 +27,6 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY src/ /app/src/
 COPY scripts/ /app/scripts/
 WORKDIR /app
-
-# Instalar browsers com Widevine CDM
-RUN playwright install --with-deps chromium
 
 # Variáveis de ambiente padrão
 ENV LOG_LEVEL=INFO
