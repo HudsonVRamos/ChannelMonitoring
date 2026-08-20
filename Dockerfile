@@ -1,6 +1,6 @@
 FROM mcr.microsoft.com/playwright/python:v1.40.0-jammy
 
-# Dependências de sistema para Widevine
+# Dependências de sistema para Widevine + Xvfb (display virtual)
 RUN apt-get update && apt-get install -y \
     libnss3 \
     libatk1.0-0 \
@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     libxrandr2 \
     libpango-1.0-0 \
     libcairo2 \
+    xvfb \
     && rm -rf /var/lib/apt/lists/*
 
 # Dependências Python
@@ -28,4 +29,5 @@ RUN playwright install --with-deps chromium
 ENV LOG_LEVEL=INFO
 ENV DISPLAY=:99
 
-ENTRYPOINT ["python", "-m", "src"]
+# Entrypoint com Xvfb (display virtual para Widevine DRM)
+ENTRYPOINT ["xvfb-run", "--auto-servernum", "--server-args=-screen 0 1920x1080x24", "python", "-m", "src"]

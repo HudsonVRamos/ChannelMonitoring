@@ -20,7 +20,7 @@ phases:
   build:
     commands:
       - echo "=== Verificando Widevine CDM no container ==="
-      - docker run --rm widevine-poc python /app/scripts/check_widevine.py || true
+      - docker run --rm --shm-size=2g widevine-poc --help || true
       - echo "=== Executando PoC dentro do container Docker ==="
       - mkdir -p output
       - |

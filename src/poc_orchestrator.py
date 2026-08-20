@@ -142,7 +142,7 @@ class PoCOrchestrator:
                 # Inicializar browser com Widevine
                 browser_start = time.perf_counter()
                 self._browser = await p.chromium.launch(
-                    headless=True,
+                    headless=False,
                     args=[
                         "--autoplay-policy="
                         "no-user-gesture-required",
