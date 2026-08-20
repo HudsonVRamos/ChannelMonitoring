@@ -3,57 +3,48 @@ version: 0.2
 env:
   parameter-store:
     POC_CHANNEL_URL: "/widevine-poc/channel-url"
-    POC_STORAGE_STATE_PATH: "/widevine-poc/storage-state-path"
     POC_LOG_LEVEL: "/widevine-poc/log-level"
   variables:
     POC_OUTPUT_DIR: "./output"
+    ARTIFACTS_BUCKET: "widevine-poc-artifacts-us-east-1-761018874615"
 
 phases:
-  install:
-    runtime-versions:
-      python: 3.11
-    commands:
-      - echo "=== Instalando dependências de sistema para Widevine ==="
-      - apt-get update -qq
-      - apt-get install -y -qq libnss3 libatk1.0-0 libatk-bridge2.0-0 libgbm1 libasound2 libxrandr2 libpango-1.0-0 libcairo2
-      - echo "=== Instalando dependências Python ==="
-      - pip install --quiet -r requirements.txt
-      - echo "=== Instalando Chromium com Widevine ==="
-      - playwright install chromium
-      - playwright install-deps chromium
-
   pre_build:
     commands:
       - echo "=== Baixando storageState do S3 ==="
       - mkdir -p storage_state
-      - aws s3 cp s3://${ARTIFACTS_BUCKET}/storage_state/state.json storage_state/state.json || echo "WARN - storageState não encontrado no S3"
-      - export POC_STORAGE_STATE_PATH="storage_state/state.json"
-      - echo "=== Executando testes unitários ==="
-      - python -m pytest tests/ --tb=short -q --ignore=tests/test_poc_orchestrator.py
-      - echo "=== Testes OK ==="
+      - aws s3 cp s3://${ARTIFACTS_BUCKET}/storage_state/state.json storage_state/state.json
+      - echo "=== Construindo imagem Docker com Playwright + Widevine ==="
+      - docker build -t widevine-poc .
 
   build:
     commands:
-      - echo "=== Iniciando PoC Widevine ==="
+      - echo "=== Executando PoC dentro do container Docker ==="
       - mkdir -p output
-      - python -m src
+      - |
+        docker run --rm \
+          --shm-size=2g \
+          -e POC_CHANNEL_URL="${POC_CHANNEL_URL}" \
+          -e POC_LOG_LEVEL="${POC_LOG_LEVEL}" \
+          -e POC_STORAGE_STATE_PATH="/app/storage_state/state.json" \
+          -e POC_OUTPUT_DIR="/app/output" \
+          -e AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}" \
+          -e AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}" \
+          -e AWS_SESSION_TOKEN="${AWS_SESSION_TOKEN}" \
+          -e AWS_DEFAULT_REGION="us-east-1" \
+          -v "$(pwd)/storage_state:/app/storage_state:ro" \
+          -v "$(pwd)/output:/app/output" \
+          widevine-poc
       - echo "=== PoC finalizada ==="
 
   post_build:
     commands:
-      - echo "=== Relatório gerado ==="
+      - echo "=== Relatório ==="
       - cat output/poc_report.json || echo "Relatório não encontrado"
-      - echo "=== Uploading artefatos para S3 ==="
       - aws s3 sync output/ s3://${ARTIFACTS_BUCKET}/output/$(date +%Y%m%d-%H%M%S)/ || true
-      - echo "=== Build concluído ==="
 
 artifacts:
   files:
     - output/**/*
   name: widevine-poc-results
   discard-paths: no
-
-cache:
-  paths:
-    - '/root/.cache/pip/**/*'
-    - '/root/.cache/ms-playwright/**/*'
