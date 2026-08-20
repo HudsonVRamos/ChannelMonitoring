@@ -146,6 +146,10 @@ class PoCOrchestrator:
                     args=[
                         "--autoplay-policy="
                         "no-user-gesture-required",
+                        "--no-sandbox",
+                        "--disable-setuid-sandbox",
+                        "--disable-web-security",
+                        "--allow-running-insecure-content",
                     ],
                 )
                 browser_init_ms = int(
@@ -182,6 +186,10 @@ class PoCOrchestrator:
                 auth_result.metrics[
                     "browser_init_time_ms"
                 ] = browser_init_ms
+
+                # === Tentar iniciar playback (clicar no player) ===
+                if auth_passed:
+                    await self._try_start_playback()
 
                 # === Validação DRM ===
                 if auth_passed:
@@ -402,6 +410,76 @@ class PoCOrchestrator:
                 end_time=self._get_timestamp(),
                 duration_ms=elapsed_ms,
                 error_message=f"Erro de autenticação: {e}",
+            )
+
+    async def _try_start_playback(self) -> None:
+        """Tenta iniciar reprodução no player.
+
+        Alguns players precisam de interação (clique) para
+        iniciar o playback e solicitar a licença DRM.
+        Tenta clicar no elemento video ou botão de play.
+        """
+        assert self._page is not None
+        self._logger.info(
+            STAGE_ID,
+            "Tentando iniciar playback no player",
+        )
+
+        try:
+            # Aguardar a página carregar o player
+            await self._page.wait_for_timeout(3000)
+
+            # Tentar clicar no elemento video diretamente
+            video = await self._page.query_selector("video")
+            if video:
+                await video.click()
+                self._logger.info(
+                    STAGE_ID,
+                    "Clicou no elemento <video>",
+                )
+                await self._page.wait_for_timeout(2000)
+                return
+
+            # Tentar clicar em botões de play comuns
+            play_selectors = [
+                "button[aria-label*='play' i]",
+                "button[aria-label*='Play' i]",
+                ".play-button",
+                ".vjs-big-play-button",
+                "[data-testid='play-button']",
+                ".player-play-button",
+                "button.play",
+            ]
+            for selector in play_selectors:
+                btn = await self._page.query_selector(selector)
+                if btn:
+                    await btn.click()
+                    self._logger.info(
+                        STAGE_ID,
+                        "Clicou no botão de play",
+                        selector=selector,
+                    )
+                    await self._page.wait_for_timeout(2000)
+                    return
+
+            # Se nenhum seletor funcionou, tentar clicar no centro da página
+            viewport = self._page.viewport_size
+            if viewport:
+                await self._page.mouse.click(
+                    viewport["width"] // 2,
+                    viewport["height"] // 2,
+                )
+                self._logger.info(
+                    STAGE_ID,
+                    "Clicou no centro do viewport",
+                )
+                await self._page.wait_for_timeout(2000)
+
+        except Exception as e:
+            self._logger.warning(
+                STAGE_ID,
+                "Falha ao tentar iniciar playback",
+                error=str(e),
             )
 
     async def _validate_drm(self) -> ValidationResult:
