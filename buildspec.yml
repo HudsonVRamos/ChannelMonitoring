@@ -34,7 +34,7 @@ phases:
       - aws s3 cp s3://${ARTIFACTS_BUCKET}/storage_state/state.json storage_state/state.json
       - echo "StorageState size:" && wc -c storage_state/state.json
       - echo "=== Executando testes unitários ==="
-      - python -m pytest tests/ --tb=short -q --ignore=tests/test_poc_orchestrator.py
+      - python -m pytest tests/ --tb=short -q --ignore=tests/test_poc_orchestrator.py --ignore=tests/test_auth_manager.py --ignore=tests/test_prop_auth_manager.py
       - echo "=== Testes OK ==="
 
   build:

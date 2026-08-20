@@ -236,13 +236,17 @@ class AuthManager:
                         + 'input[name="email"], input[name="password"], '
                         + 'input[name="username"], input[name="login"]'
                     );
-                    const loginBtns = document.querySelectorAll(
-                        'button[type="submit"], '
-                        + 'button:has-text("Entrar"), '
-                        + 'button:has-text("Login"), '
-                        + 'a:has-text("Entrar")'
-                    );
-                    return inputs.length > 0 || loginBtns.length > 0;
+                    // Procurar botões com texto de login
+                    const buttons = document.querySelectorAll('button, a');
+                    let hasLoginBtn = false;
+                    for (const btn of buttons) {
+                        const text = (btn.textContent || '').toLowerCase().trim();
+                        if (text === 'entrar' || text === 'login' || text === 'acessar') {
+                            hasLoginBtn = true;
+                            break;
+                        }
+                    }
+                    return inputs.length > 0 || hasLoginBtn;
                 }"""
             )
             if has_login_form:
