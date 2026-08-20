@@ -1,0 +1,78 @@
+{
+  "execution_id": "35e47b52-18e0-4cd3-8d84-89e11f8b5999",
+  "start_time": "2026-08-20T16:29:15.470Z",
+  "end_time": "2026-08-20T16:29:37.735Z",
+  "total_duration_ms": 17070,
+  "decision": "NO_GO",
+  "validations": [
+    {
+      "name": "login",
+      "status": "PASS",
+      "start_time": "2026-08-20T16:29:15.470Z",
+      "end_time": "2026-08-20T16:29:17.447Z",
+      "duration_ms": 1976,
+      "metrics": {
+        "session_restore_time_ms": 1976,
+        "browser_init_time_ms": 201
+      }
+    },
+    {
+      "name": "drm",
+      "status": "FAIL",
+      "start_time": "2026-08-20T16:29:22.640Z",
+      "end_time": "2026-08-20T16:29:37.735Z",
+      "duration_ms": 15094,
+      "error_message": "Timeout (15s): MediaKeys não foi criado",
+      "metrics": {
+        "drm_ready_time_ms": 15094,
+        "media_keys_created": false,
+        "license_requested": false
+      }
+    },
+    {
+      "name": "telemetry",
+      "status": "SKIPPED",
+      "start_time": "2026-08-20T16:29:37.735Z",
+      "end_time": "2026-08-20T16:29:37.735Z",
+      "duration_ms": 0,
+      "skipped_reason": "Dependência falhou: drm"
+    },
+    {
+      "name": "frames",
+      "status": "SKIPPED",
+      "start_time": "2026-08-20T16:29:37.735Z",
+      "end_time": "2026-08-20T16:29:37.735Z",
+      "duration_ms": 0,
+      "skipped_reason": "Dependência falhou: drm"
+    },
+    {
+      "name": "opencv",
+      "status": "SKIPPED",
+      "start_time": "2026-08-20T16:29:37.735Z",
+      "end_time": "2026-08-20T16:29:37.735Z",
+      "duration_ms": 0,
+      "skipped_reason": "Dependência falhou: frames"
+    },
+    {
+      "name": "bedrock",
+      "status": "SKIPPED",
+      "start_time": "2026-08-20T16:29:37.735Z",
+      "end_time": "2026-08-20T16:29:37.735Z",
+      "duration_ms": 0,
+      "skipped_reason": "Dependência falhou: opencv"
+    }
+  ],
+  "performance": {
+    "browser_init_time_ms": 201,
+    "drm_ready_time_ms": 15094,
+    "time_per_frame_ms": 0,
+    "bedrock_response_time_ms": null
+  },
+  "log_file_path": "/app/output/poc_execution.log",
+  "environment": {
+    "python_version": "3.10.12",
+    "playwright_version": "unknown",
+    "opencv_version": "4.9.0",
+    "numpy_version": "1.26.4"
+  }
+}

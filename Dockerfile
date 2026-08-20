@@ -20,8 +20,8 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY src/ /app/src/
 WORKDIR /app
 
-# Instalar browsers com Widevine
-RUN playwright install chromium
+# Instalar browsers com Widevine CDM
+RUN playwright install --with-deps chromium
 
 # Variáveis de ambiente padrão
 ENV LOG_LEVEL=INFO
