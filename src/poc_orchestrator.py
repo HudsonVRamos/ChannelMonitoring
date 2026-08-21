@@ -377,24 +377,29 @@ class PoCOrchestrator:
         )
 
         try:
-            # Validar storageState
-            is_valid = (
-                self._auth_manager.validate_storage_state()
+            # Se usando Chrome profile, pular validação de storageState
+            chrome_profile = os.environ.get(
+                "CHROME_PROFILE_DIR", ""
             )
-            if not is_valid:
-                elapsed_ms = int(
-                    (time.perf_counter() - start_perf) * 1000
+            if not chrome_profile or not os.path.isdir(chrome_profile):
+                # Validar storageState (modo legado)
+                is_valid = (
+                    self._auth_manager.validate_storage_state()
                 )
-                return ValidationResult(
-                    name="login",
-                    status=ValidationStatus.FAIL,
-                    start_time=start_time,
-                    end_time=self._get_timestamp(),
-                    duration_ms=elapsed_ms,
-                    error_message=(
-                        "StorageState inválido ou não encontrado"
-                    ),
-                )
+                if not is_valid:
+                    elapsed_ms = int(
+                        (time.perf_counter() - start_perf) * 1000
+                    )
+                    return ValidationResult(
+                        name="login",
+                        status=ValidationStatus.FAIL,
+                        start_time=start_time,
+                        end_time=self._get_timestamp(),
+                        duration_ms=elapsed_ms,
+                        error_message=(
+                            "StorageState inválido ou não encontrado"
+                        ),
+                    )
 
             # Navegar para o canal e verificar sessão
             assert self._page is not None
