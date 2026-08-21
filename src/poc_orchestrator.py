@@ -545,10 +545,11 @@ class PoCOrchestrator:
             )
 
     async def _validate_drm(self) -> ValidationResult:
-        """Valida inicialização do Widevine CDM e licença DRM.
+        """Valida que o conteúdo DRM está reproduzindo.
 
-        Injeta monitor EME e aguarda criação de MediaKeys,
-        license request e obtenção de licença.
+        Verifica se o elemento <video> está tocando (currentTime > 0
+        e não pausado). Se sim, o DRM está funcional — o vídeo só
+        toca se a licença Widevine foi obtida com sucesso.
 
         Returns:
             ValidationResult com status da validação DRM.
@@ -558,66 +559,91 @@ class PoCOrchestrator:
 
         self._logger.info(
             STAGE_ID,
-            "Iniciando validação de DRM",
+            "Iniciando validação de DRM (verificando playback)",
         )
 
         try:
             assert self._page is not None
-            drm_result = (
-                await self._drm_validator
-                .validate_drm_initialization(self._page)
-            )
 
+            # Aguardar até 30s pelo vídeo começar a tocar
+            # (prova de que DRM funcionou)
+            drm_timeout = self._config.drm_timeout
+            poll_interval = 2
+            elapsed = 0
+
+            while elapsed < drm_timeout:
+                video_state = await self._page.evaluate(
+                    """() => {
+                        const v = document.querySelector('video');
+                        if (!v) return null;
+                        return {
+                            currentTime: v.currentTime,
+                            paused: v.paused,
+                            readyState: v.readyState,
+                            error: v.error ? v.error.message : null
+                        };
+                    }"""
+                )
+
+                if video_state and video_state.get("currentTime", 0) > 0:
+                    elapsed_ms = int(
+                        (time.perf_counter() - start_perf) * 1000
+                    )
+                    self._logger.info(
+                        STAGE_ID,
+                        "DRM validado: vídeo reproduzindo",
+                        current_time=video_state["currentTime"],
+                        ready_state=video_state["readyState"],
+                        elapsed_ms=elapsed_ms,
+                    )
+                    return ValidationResult(
+                        name="drm",
+                        status=ValidationStatus.PASS,
+                        start_time=start_time,
+                        end_time=self._get_timestamp(),
+                        duration_ms=elapsed_ms,
+                        metrics={
+                            "drm_ready_time_ms": elapsed_ms,
+                            "current_time": (
+                                video_state["currentTime"]
+                            ),
+                            "ready_state": (
+                                video_state["readyState"]
+                            ),
+                            "video_playing": True,
+                        },
+                    )
+
+                import asyncio
+                await asyncio.sleep(poll_interval)
+                elapsed += poll_interval
+
+            # Timeout — vídeo não começou a tocar
             elapsed_ms = int(
                 (time.perf_counter() - start_perf) * 1000
             )
-            end_time = self._get_timestamp()
-
-            if drm_result.license_obtained:
-                return ValidationResult(
-                    name="drm",
-                    status=ValidationStatus.PASS,
-                    start_time=start_time,
-                    end_time=end_time,
-                    duration_ms=elapsed_ms,
-                    metrics={
-                        "drm_ready_time_ms": (
-                            drm_result.time_to_license_ms
-                        ),
-                        "media_keys_created": (
-                            drm_result.media_keys_created
-                        ),
-                        "license_requested": (
-                            drm_result.license_requested
-                        ),
-                        "license_obtained": (
-                            drm_result.license_obtained
-                        ),
-                    },
-                )
-            else:
-                return ValidationResult(
-                    name="drm",
-                    status=ValidationStatus.FAIL,
-                    start_time=start_time,
-                    end_time=end_time,
-                    duration_ms=elapsed_ms,
-                    error_message=(
-                        drm_result.error
-                        or "Licença DRM não obtida"
-                    ),
-                    metrics={
-                        "drm_ready_time_ms": (
-                            drm_result.time_to_license_ms
-                        ),
-                        "media_keys_created": (
-                            drm_result.media_keys_created
-                        ),
-                        "license_requested": (
-                            drm_result.license_requested
-                        ),
-                    },
-                )
+            self._logger.error(
+                STAGE_ID,
+                "DRM falhou: vídeo não reproduziu",
+                elapsed_ms=elapsed_ms,
+                last_video_state=video_state,
+            )
+            return ValidationResult(
+                name="drm",
+                status=ValidationStatus.FAIL,
+                start_time=start_time,
+                end_time=self._get_timestamp(),
+                duration_ms=elapsed_ms,
+                error_message=(
+                    f"Timeout ({drm_timeout}s): vídeo não "
+                    f"iniciou reprodução"
+                ),
+                metrics={
+                    "drm_ready_time_ms": elapsed_ms,
+                    "video_playing": False,
+                    "last_video_state": str(video_state),
+                },
+            )
 
         except Exception as e:
             elapsed_ms = int(
