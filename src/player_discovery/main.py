@@ -161,7 +161,36 @@ class PlayerDiscoveryOrchestrator:
         )
 
         try:
-            # 1. Executar Discovery Engine
+            # 1. Navegar para o primeiro canal e esperar player carregar
+            first_channel = channels[0] if channels else None
+            if first_channel:
+                self._structured_logger.info(
+                    "orchestrator.navigate",
+                    "Navegando para o primeiro canal para discovery",
+                    url=first_channel,
+                )
+                await self._page.goto(
+                    first_channel,
+                    wait_until="domcontentloaded",
+                    timeout=30000,
+                )
+                # Esperar o elemento <video> aparecer (até 15s)
+                try:
+                    await self._page.wait_for_selector(
+                        "video", timeout=15000
+                    )
+                    self._structured_logger.info(
+                        "orchestrator.navigate.video_found",
+                        "Elemento <video> encontrado — iniciando discovery",
+                    )
+                except Exception:
+                    self._structured_logger.warning(
+                        "orchestrator.navigate.no_video",
+                        "Elemento <video> não encontrado em 15s — "
+                        "discovery executará com DOM atual",
+                    )
+
+            # 2. Executar Discovery Engine (agora com o player na página)
             self._structured_logger.info(
                 "orchestrator.discovery",
                 "Executando discovery completo de capabilities",

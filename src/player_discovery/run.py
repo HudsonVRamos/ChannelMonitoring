@@ -262,7 +262,11 @@ def main() -> None:
     # Lista de canais (separados por vírgula)
     channels_str = os.environ.get(
         "PLAYER_DISCOVERY_CHANNELS",
-        "https://www.skymais.com.br/player/live/CH0100000000124",
+        "https://www.skymais.com.br/player/live/CH0100000000124,"
+        "https://www.skymais.com.br/player/live/CH0100000000092,"
+        "https://www.skymais.com.br/player/live/CH0100000000093,"
+        "https://www.skymais.com.br/player/live/CH0100000000094,"
+        "https://www.skymais.com.br/player/live/CH0100000000096",
     )
     channels = [ch.strip() for ch in channels_str.split(",") if ch.strip()]
 
