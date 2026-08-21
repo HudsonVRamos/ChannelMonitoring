@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 
-from hypothesis import given, settings
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from src.audio_subtitle_monitor.models import (
@@ -102,7 +102,7 @@ class TestReportSerializationCompleteness:
     """
 
     @given(report=channel_test_report_strategy())
-    @settings(max_examples=100)
+    @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     def test_top_level_keys_present(self, report: ChannelTestReport):
         """**Validates: Requirements 7.1**
 
@@ -126,7 +126,7 @@ class TestReportSerializationCompleteness:
             )
 
     @given(report=channel_test_report_strategy())
-    @settings(max_examples=100)
+    @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     def test_track_result_keys_present(self, report: ChannelTestReport):
         """**Validates: Requirements 7.4**
 
@@ -152,7 +152,7 @@ class TestReportSerializationCompleteness:
                 )
 
     @given(report=channel_test_report_strategy())
-    @settings(max_examples=100)
+    @settings(max_examples=100, suppress_health_check=[HealthCheck.too_slow])
     def test_serialized_values_match_original(self, report: ChannelTestReport):
         """**Validates: Requirements 7.1**
 
