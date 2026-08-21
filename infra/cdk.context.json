@@ -7,5 +7,10 @@
     "us-east-1d",
     "us-east-1e",
     "us-east-1f"
+  ],
+  "availability-zones:account=761018874615:region=sa-east-1": [
+    "sa-east-1a",
+    "sa-east-1b",
+    "sa-east-1c"
   ]
 }

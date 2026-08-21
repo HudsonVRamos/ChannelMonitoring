@@ -25,7 +25,7 @@ EC2MonitorStack(
     f"{project_name}-ec2-stack",
     project_name=project_name,
     description="EC2 para monitoramento SKY+ — Fase 1 (Chrome + Xvfb + VNC)",
-    env=env,
+    env=cdk.Environment(account="761018874615", region="sa-east-1"),
 )
 
 app.synth()

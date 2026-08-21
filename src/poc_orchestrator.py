@@ -141,53 +141,73 @@ class PoCOrchestrator:
             try:
                 # Inicializar browser com Widevine (Google Chrome com CDM built-in)
                 browser_start = time.perf_counter()
-                self._browser = await p.chromium.launch(
-                    channel="chrome",
-                    headless=False,
-                    args=[
-                        "--autoplay-policy="
-                        "no-user-gesture-required",
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--disable-web-security",
-                        "--allow-running-insecure-content",
-                    ],
+
+                # Se user_data_dir existe, usar persistent context
+                chrome_profile = os.environ.get(
+                    "CHROME_PROFILE_DIR", "/data/chrome-profile"
                 )
+                use_profile = os.path.isdir(chrome_profile)
+
+                if use_profile:
+                    self._logger.info(
+                        STAGE_ID,
+                        "Usando persistent context com Chrome profile",
+                        profile_dir=chrome_profile,
+                    )
+                    self._context = (
+                        await p.chromium.launch_persistent_context(
+                            user_data_dir=chrome_profile,
+                            channel="chrome",
+                            headless=False,
+                            args=[
+                                "--autoplay-policy="
+                                "no-user-gesture-required",
+                                "--no-sandbox",
+                                "--disable-setuid-sandbox",
+                            ],
+                            viewport={"width": 1920, "height": 1080},
+                        )
+                    )
+                    self._page = (
+                        self._context.pages[0]
+                        if self._context.pages
+                        else await self._context.new_page()
+                    )
+                else:
+                    self._browser = await p.chromium.launch(
+                        channel="chrome",
+                        headless=False,
+                        args=[
+                            "--autoplay-policy="
+                            "no-user-gesture-required",
+                            "--no-sandbox",
+                            "--disable-setuid-sandbox",
+                        ],
+                    )
+                    # Criar contexto com storageState
+                    storage_path = (
+                        self._config.storage_state_path
+                        if os.path.exists(
+                            self._config.storage_state_path
+                        )
+                        else None
+                    )
+                    self._context = (
+                        await self._browser.new_context(
+                            storage_state=storage_path,
+                        )
+                    )
+                    self._page = await self._context.new_page()
+
                 browser_init_ms = int(
                     (time.perf_counter() - browser_start) * 1000
                 )
                 self._logger.info(
                     STAGE_ID,
-                    "Browser Chromium inicializado",
+                    "Browser inicializado",
                     browser_init_time_ms=browser_init_ms,
+                    using_profile=use_profile,
                 )
-
-                # Criar contexto com storageState
-                storage_path = (
-                    self._config.storage_state_path
-                    if os.path.exists(
-                        self._config.storage_state_path
-                    )
-                    else None
-                )
-                self._logger.info(
-                    STAGE_ID,
-                    "Criando contexto com storageState",
-                    storage_state_path=(
-                        self._config.storage_state_path
-                    ),
-                    file_exists=os.path.exists(
-                        self._config.storage_state_path
-                    ),
-                    resolved_path=storage_path,
-                    cwd=os.getcwd(),
-                )
-                self._context = (
-                    await self._browser.new_context(
-                        storage_state=storage_path,
-                    )
-                )
-                self._page = await self._context.new_page()
 
                 # === Validação Auth ===
                 auth_result = await self._validate_auth()
@@ -300,13 +320,15 @@ class PoCOrchestrator:
                     error_type=type(e).__name__,
                 )
             finally:
-                # Fechar browser
+                # Fechar browser/context
                 if self._browser:
                     await self._browser.close()
-                    self._logger.info(
-                        STAGE_ID,
-                        "Browser fechado com sucesso",
-                    )
+                elif self._context:
+                    await self._context.close()
+                self._logger.info(
+                    STAGE_ID,
+                    "Browser fechado com sucesso",
+                )
 
         # Gerar relatório consolidado
         report = self._report_generator.generate(results)

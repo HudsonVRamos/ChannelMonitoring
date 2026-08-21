@@ -30,7 +30,7 @@ set -e
 
 echo "=== Atualizando sistema ==="
 apt-get update -qq
-apt-get upgrade -y -qq
+export DEBIAN_FRONTEND=noninteractive
 
 echo "=== Instalando dependências base ==="
 apt-get install -y -qq \\
@@ -172,6 +172,12 @@ class EC2MonitorStack(Stack):
             ec2.Port.tcp(22),
             "SSH access",
         )
+        # RDP (xrdp para acesso remoto visual)
+        sg.add_ingress_rule(
+            ec2.Peer.any_ipv4(),
+            ec2.Port.tcp(3389),
+            "RDP access",
+        )
 
         # ==============================================================
         # IAM Role — Bedrock + S3 + SSM
@@ -212,10 +218,11 @@ class EC2MonitorStack(Stack):
         instance = ec2.Instance(
             self,
             "MonitorInstance",
-            instance_type=ec2.InstanceType("t3.medium"),
+            instance_type=ec2.InstanceType("t3.large"),
             machine_image=ec2.MachineImage.generic_linux(
                 ami_map={
                     "us-east-1": "ami-0c7217cdde317cfec",  # Ubuntu 22.04 LTS
+                    "sa-east-1": "ami-0a8d820d3a2ad655a",  # Ubuntu 22.04 LTS
                 }
             ),
             vpc=vpc,
