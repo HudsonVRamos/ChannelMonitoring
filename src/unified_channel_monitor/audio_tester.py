@@ -5,7 +5,7 @@ integração com VideoTelemetryCollector para anotações de correlação
 entre track switches e telemetria de vídeo.
 
 Fluxo principal:
-1. Abre Settings Dialog via CapabilityMap
+1. Abre Settings Dialog via SettingsDialogManager (componente existente)
 2. Descobre tracks disponíveis na seção "IDIOMA ALTERNATIVO"
 3. Para cada track: seleciona, valida via Shaka API, coleta RMS
 4. Restaura track original ao final
@@ -22,6 +22,11 @@ import time
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
+from src.audio_subtitle_monitor.config import AudioSubtitleConfig
+from src.audio_subtitle_monitor.settings_dialog_manager import (
+    AUDIO_SECTION_TITLE,
+    SettingsDialogManager,
+)
 from src.unified_channel_monitor.config import UnifiedMonitorConfig
 from src.unified_channel_monitor.models import AudioTrackResult
 
@@ -33,9 +38,6 @@ if TYPE_CHECKING:
     )
 
 logger = logging.getLogger(__name__)
-
-# Seção do Settings Dialog onde ficam as opções de áudio
-_AUDIO_SECTION_TITLE = "IDIOMA ALTERNATIVO"
 
 # JavaScript para consultar tracks de áudio via Shaka Player API
 _JS_GET_AUDIO_TRACKS = """
@@ -114,6 +116,22 @@ class AudioTrackTester:
         self._config = config
         self._telemetry_collector = telemetry_collector
 
+        # Cria AudioSubtitleConfig compatível com componentes existentes
+        self._legacy_config = AudioSubtitleConfig(
+            audio_telemetry_window_s=config.audio_telemetry_window_s,
+            audio_sample_interval_s=config.audio_sample_interval_s,
+            audio_pass_threshold=config.audio_pass_threshold,
+            audio_rms_threshold=config.audio_rms_threshold,
+            track_switch_timeout_s=config.track_switch_timeout_s,
+        )
+
+        # Reutiliza SettingsDialogManager existente (funciona com SKY+)
+        self._dialog_manager = SettingsDialogManager(
+            page=page,
+            capability_map=capability_map,
+            config=self._legacy_config,
+        )
+
     async def test_all_tracks(self) -> list[AudioTrackResult]:
         """Descobre e testa todos os audio tracks disponíveis.
 
@@ -156,7 +174,7 @@ class AudioTrackTester:
         if not tracks:
             logger.warning(
                 "Nenhum track de áudio encontrado na seção "
-                f"'{_AUDIO_SECTION_TITLE}'."
+                f"'{AUDIO_SECTION_TITLE}'."
             )
             await self._close_settings_dialog()
             return results
@@ -303,27 +321,20 @@ class AudioTrackTester:
             )
 
     async def _open_settings_dialog(self) -> bool:
-        """Abre o Settings Dialog via hover + clique no ícone.
+        """Abre o Settings Dialog via SettingsDialogManager.
 
-        Utiliza seletores do player para exibir controles via hover
-        e então clica no ícone de configurações.
+        Reutiliza o componente existente que já sabe como interagir
+        com o player SKY+ (hover para mostrar controles, clicar no
+        ícone correto).
 
         Returns:
             True se o dialog foi aberto com sucesso.
         """
         try:
-            # Hover no player para exibir controles
-            await self._page.hover("video")
-            await asyncio.sleep(0.3)
-
-            # Localizar e clicar no settings icon
-            settings_selector = self._get_settings_selector()
-            await self._page.click(settings_selector)
-            await asyncio.sleep(0.5)
-
-            logger.info("Settings Dialog aberto para teste de áudio.")
-            return True
-
+            result = await self._dialog_manager.open_dialog()
+            if result:
+                logger.info("Settings Dialog aberto para teste de áudio.")
+            return result
         except Exception as exc:
             logger.error(
                 f"Falha ao abrir Settings Dialog: {exc}"
@@ -331,110 +342,29 @@ class AudioTrackTester:
             return False
 
     async def _close_settings_dialog(self) -> None:
-        """Fecha o Settings Dialog pressionando Escape."""
+        """Fecha o Settings Dialog via SettingsDialogManager."""
         try:
-            await self._page.keyboard.press("Escape")
-            await asyncio.sleep(0.3)
-            logger.debug("Settings Dialog fechado.")
+            await self._dialog_manager.close_dialog()
         except Exception as exc:
             logger.warning(
                 f"Erro ao fechar Settings Dialog: {exc}"
             )
 
     async def _discover_audio_tracks(self) -> list[dict]:
-        """Descobre tracks de áudio na seção 'IDIOMA ALTERNATIVO'.
+        """Descobre tracks de áudio via SettingsDialogManager.
 
-        Executa JavaScript no DOM para localizar a seção e extrair
-        as opções disponíveis com seu estado de seleção.
+        Usa discover_audio_options() do componente existente que já
+        sabe navegar o DOM do player SKY+.
 
         Returns:
             Lista de dicts com 'text' e 'is_selected' por track.
         """
-        js_discover = """
-        (sectionTitle) => {
-            const allElements = document.querySelectorAll('*');
-            let sectionHeader = null;
-
-            for (const el of allElements) {
-                const text = el.textContent?.trim();
-                if (text === sectionTitle
-                    && el.children.length === 0) {
-                    sectionHeader = el;
-                    break;
-                }
-                if (el.innerText?.trim() === sectionTitle
-                    && el.children.length <= 1) {
-                    sectionHeader = el;
-                    break;
-                }
-            }
-
-            if (!sectionHeader) return [];
-
-            let sectionContainer = sectionHeader.parentElement;
-            for (let i = 0; i < 3; i++) {
-                if (!sectionContainer) break;
-                const items = sectionContainer.querySelectorAll(
-                    'li, [role="option"], [role="menuitemradio"], '
-                    + '[role="menuitem"], button'
-                );
-                if (items.length > 0) break;
-                sectionContainer = sectionContainer.parentElement;
-            }
-
-            if (!sectionContainer) return [];
-
-            const optionItems = sectionContainer.querySelectorAll(
-                'li, [role="option"], [role="menuitemradio"], '
-                + '[role="menuitem"]'
-            );
-
-            let items = optionItems.length > 0
-                ? optionItems
-                : sectionContainer.querySelectorAll(
-                    'button, div[class*="option"], '
-                    + 'div[class*="item"]'
-                );
-
-            const results = [];
-            for (const item of items) {
-                const itemText = item.textContent?.trim();
-                if (!itemText || itemText === sectionTitle) continue;
-                if (results.some(r => r.text === itemText)) continue;
-
-                const classList = item.className || '';
-                const ariaSelected =
-                    item.getAttribute('aria-selected');
-                const ariaChecked =
-                    item.getAttribute('aria-checked');
-                const isSelected = (
-                    classList.includes('active') ||
-                    classList.includes('selected') ||
-                    classList.includes('checked') ||
-                    classList.includes('current') ||
-                    ariaSelected === 'true' ||
-                    ariaChecked === 'true' ||
-                    item.hasAttribute('data-selected') ||
-                    item.hasAttribute('data-active')
-                );
-
-                results.push({
-                    text: itemText,
-                    is_selected: isSelected
-                });
-            }
-
-            return results;
-        }
-        """
-
         try:
-            result = await self._page.evaluate(
-                js_discover, _AUDIO_SECTION_TITLE
-            )
-            if isinstance(result, list):
-                return result
-            return []
+            options = await self._dialog_manager.discover_audio_options()
+            return [
+                {"text": opt.text, "is_selected": opt.is_selected}
+                for opt in options
+            ]
         except Exception as exc:
             logger.error(
                 f"Erro ao descobrir tracks de áudio: {exc}"
@@ -442,10 +372,7 @@ class AudioTrackTester:
             return []
 
     async def _select_track(self, track_name: str) -> bool:
-        """Seleciona um track via clique na UI do Settings Dialog.
-
-        Garante que o dialog está aberto e clica na opção
-        correspondente ao track_name.
+        """Seleciona um track via SettingsDialogManager.
 
         Args:
             track_name: Nome do track a selecionar.
@@ -453,64 +380,9 @@ class AudioTrackTester:
         Returns:
             True se o clique foi executado com sucesso.
         """
-        js_click = """
-        ([sectionTitle, optionText]) => {
-            const allElements = document.querySelectorAll('*');
-            let sectionHeader = null;
-
-            for (const el of allElements) {
-                const text = el.textContent?.trim();
-                if (text === sectionTitle
-                    && el.children.length === 0) {
-                    sectionHeader = el;
-                    break;
-                }
-                if (el.innerText?.trim() === sectionTitle
-                    && el.children.length <= 1) {
-                    sectionHeader = el;
-                    break;
-                }
-            }
-
-            if (!sectionHeader) return false;
-
-            let sectionContainer = sectionHeader.parentElement;
-            for (let i = 0; i < 3; i++) {
-                if (!sectionContainer) break;
-                const items = sectionContainer.querySelectorAll(
-                    'li, [role="option"], [role="menuitemradio"], '
-                    + '[role="menuitem"], button'
-                );
-                if (items.length > 0) break;
-                sectionContainer = sectionContainer.parentElement;
-            }
-
-            if (!sectionContainer) return false;
-
-            const optionItems = sectionContainer.querySelectorAll(
-                'li, [role="option"], [role="menuitemradio"], '
-                + '[role="menuitem"], button, '
-                + 'div[class*="option"], div[class*="item"]'
-            );
-
-            for (const item of optionItems) {
-                const itemText = item.textContent?.trim();
-                if (itemText === optionText) {
-                    item.click();
-                    return true;
-                }
-            }
-
-            return false;
-        }
-        """
-
         try:
-            # Garantir dialog aberto antes de clicar
-            await self._ensure_dialog_open()
-
-            result = await self._page.evaluate(
-                js_click, [_AUDIO_SECTION_TITLE, track_name]
+            result = await self._dialog_manager.select_option(
+                AUDIO_SECTION_TITLE, track_name
             )
             if result:
                 logger.debug(
@@ -652,9 +524,7 @@ class AudioTrackTester:
     async def _restore_original_track(
         self, original_track: str
     ) -> None:
-        """Restaura o track de áudio original.
-
-        Reabre o dialog se necessário e seleciona o track original.
+        """Restaura o track de áudio original via SettingsDialogManager.
 
         Args:
             original_track: Nome do track a restaurar.
@@ -664,58 +534,8 @@ class AudioTrackTester:
         logger.info(
             f"Restaurando track original: '{original_track}'"
         )
-        await self._ensure_dialog_open()
         await self._select_track(original_track)
         await asyncio.sleep(0.5)
-
-    async def _ensure_dialog_open(self) -> None:
-        """Garante que o Settings Dialog está aberto.
-
-        Se o dialog fechou automaticamente após uma seleção,
-        reabre via hover + clique.
-        """
-        try:
-            # Verificar se dialog está visível
-            dialog_selectors = [
-                ".settings-panel",
-                '[role="dialog"]',
-                '[aria-label*="settings"]',
-            ]
-            for selector in dialog_selectors:
-                locator = self._page.locator(selector)
-                if await locator.is_visible():
-                    return  # Dialog já está aberto
-
-            # Dialog não visível — reabrir
-            await self._open_settings_dialog()
-        except Exception:
-            # Best effort — tentar reabrir
-            await self._open_settings_dialog()
-
-    def _get_settings_selector(self) -> str:
-        """Obtém o seletor do ícone de settings do CapabilityMap.
-
-        Consulta o capability_map para estratégia de interação com
-        o ícone de configurações. Retorna seletor CSS adequado.
-
-        Returns:
-            Seletor CSS para o ícone de configurações.
-        """
-        # Tentar extrair do capability_map
-        if isinstance(self._capability_map, dict):
-            settings_info = self._capability_map.get("settings")
-            if settings_info and isinstance(settings_info, dict):
-                selector = settings_info.get("selector")
-                if selector:
-                    return selector
-
-        # Fallback: seletores comuns para botão de settings
-        return (
-            'button[aria-label*="settings"], '
-            'button[aria-label*="configurações"], '
-            '.settings-button, '
-            '[data-testid="settings"]'
-        )
 
     @staticmethod
     def _find_selected_track(
