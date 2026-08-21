@@ -40,22 +40,13 @@ sleep 2
 # --- 2. Configurar display ---
 echo "[2/5] Configurando display..."
 
-# Se DISPLAY já está definido externamente, usar esse
-if [ -n "$DISPLAY" ]; then
+# Se DISPLAY já está definido e funcional, usar esse
+if [ -n "$DISPLAY" ] && xdpyinfo -display "$DISPLAY" >/dev/null 2>&1; then
     echo "  Usando display existente: $DISPLAY"
-# Se VNC está rodando (:1), usar o VNC para que Chrome seja visível
-elif pgrep -f "Xvnc.*:1" > /dev/null 2>&1 || pgrep -f "vncserver" > /dev/null 2>&1; then
-    export DISPLAY=:1
-    echo "  VNC detectado — usando DISPLAY=:1 (Chrome visível no VNC)"
-# Senão, usar Xvfb (headless puro)
+    USE_XVFB_RUN=false
 else
-    if ! pgrep -x Xvfb > /dev/null; then
-        echo "  Iniciando Xvfb :99..."
-        Xvfb :99 -screen 0 1920x1080x24 &
-        sleep 1
-    fi
-    export DISPLAY=:99
-    echo "  Usando Xvfb headless: DISPLAY=:99"
+    echo "  Nenhum display funcional detectado — usando xvfb-run"
+    USE_XVFB_RUN=true
 fi
 
 # --- 3. Configurar variáveis de ambiente ---
@@ -117,11 +108,21 @@ MODE="${1:-single}"
 if [ "$MODE" == "--continuous" ] || [ "$MODE" == "-c" ]; then
     echo ">>> Modo CONTÍNUO (Ctrl+C para parar)"
     echo ""
-    python3 -m src.player_discovery.run --continuous
+    if [ "$USE_XVFB_RUN" = true ]; then
+        xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
+            python3 -m src.player_discovery.run --continuous
+    else
+        python3 -m src.player_discovery.run --continuous
+    fi
 else
     echo ">>> Modo SINGLE (uma rotação completa)"
     echo ""
-    python3 -m src.player_discovery.run
+    if [ "$USE_XVFB_RUN" = true ]; then
+        xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
+            python3 -m src.player_discovery.run
+    else
+        python3 -m src.player_discovery.run
+    fi
 fi
 
 EXIT_CODE=$?
