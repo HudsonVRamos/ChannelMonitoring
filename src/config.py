@@ -134,8 +134,10 @@ class PoCConfig:
         errors: list[str] = []
 
         # Campos obrigatórios
-        if not self.storage_state_path:
-            errors.append("storage_state_path não pode ser vazio")
+        # storage_state_path é opcional se CHROME_PROFILE_DIR estiver definido
+        chrome_profile = os.environ.get("CHROME_PROFILE_DIR", "")
+        if not self.storage_state_path and not chrome_profile:
+            errors.append("storage_state_path não pode ser vazio (ou defina CHROME_PROFILE_DIR)")
         if not self.channel_url:
             errors.append("channel_url não pode ser vazio")
 
