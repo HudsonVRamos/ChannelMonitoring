@@ -826,6 +826,46 @@ class UnifiedOrchestrator:
             "player_type": "unknown",
         }
 
+    def _get_dialog_capability_map(self):
+        """Retorna CapabilityMap adaptado para o SettingsDialogManager.
+
+        O SettingsDialogManager precisa de um objeto com
+        get_interaction_strategy() e get_capability(). Se o
+        CapabilityMap real não tem a capability 'settings' confirmada
+        (behavioral test retorna False), usamos um mock que força
+        o fallback heurístico (semantic_dom) — que é o que funciona
+        no player SKY+.
+
+        Returns:
+            CapabilityMap real se settings está confirmado,
+            ou mock com heurísticas se não.
+        """
+        if self._capability_map is None:
+            from unittest.mock import MagicMock
+            cm = MagicMock()
+            cm.get_interaction_strategy.return_value = None
+            cm.get_capability.return_value = None
+            cm.is_valid.return_value = True
+            return cm
+
+        # Verificar se o CapabilityMap real confirma 'settings'
+        try:
+            settings_cap = self._capability_map.get_capability("settings")
+            if settings_cap and getattr(settings_cap, "available", False):
+                # Settings confirmado — usar CapabilityMap real
+                return self._capability_map
+        except (AttributeError, TypeError):
+            pass
+
+        # Settings não confirmado — usar mock com heurísticas
+        # (mesma abordagem do audio_subtitle_monitor/run.py)
+        from unittest.mock import MagicMock
+        cm = MagicMock()
+        cm.get_interaction_strategy.return_value = None
+        cm.get_capability.return_value = None
+        cm.is_valid.return_value = True
+        return cm
+
     def _invalidate_capability_map(self) -> None:
         """Invalida o CapabilityMap para forçar re-discovery.
 
@@ -864,7 +904,7 @@ class UnifiedOrchestrator:
 
         audio_tester = AudioTrackTester(
             page=self._page,
-            capability_map=self._capability_map,
+            capability_map=self._get_dialog_capability_map(),
             config=self._config,
             telemetry_collector=telemetry_collector,
         )
@@ -1005,7 +1045,7 @@ class UnifiedOrchestrator:
 
         subtitle_tester = SubtitleTrackTester(
             page=self._page,
-            capability_map=self._capability_map,
+            capability_map=self._get_dialog_capability_map(),
             config=self._config,
             telemetry_collector=telemetry_collector,
         )
