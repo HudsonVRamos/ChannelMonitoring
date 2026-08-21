@@ -157,7 +157,7 @@ class PoCOrchestrator:
                     self._context = (
                         await p.chromium.launch_persistent_context(
                             user_data_dir=chrome_profile,
-                            channel="chrome",
+                            executable_path="/usr/bin/google-chrome",
                             headless=False,
                             args=[
                                 "--autoplay-policy="
