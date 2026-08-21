@@ -107,12 +107,21 @@ CHANNEL_MONITORING/
 │   │       ├── buffer_probe.py       # buffer_ahead, waiting events
 │   │       └── event_probe.py        # Todos eventos HTMLMediaElement
 │   │
-│   └── audio_subtitle_monitor/        # ★ MÓDULO EM DESENVOLVIMENTO
-│       └── ...                        # Interação com UI do player (áudio/legendas)
+│   └── audio_subtitle_monitor/        # ★ MÓDULO IMPLEMENTADO — Audio/Subtitle Monitor
+│       ├── __init__.py                # Exports públicos
+│       ├── main.py                    # Entry point (run_audio_subtitle_monitoring)
+│       ├── config.py                  # AudioSubtitleConfig (dataclass + env vars)
+│       ├── models.py                  # Data models (TrackTestResult, ChannelTestReport, etc.)
+│       ├── settings_dialog_manager.py # Gerencia Settings Dialog do player
+│       ├── audio_monitor.py           # Validação + telemetria de áudio (Web Audio API)
+│       ├── subtitle_monitor.py        # Validação + cues de legendas (TextTrack API)
+│       ├── report_generator.py        # Relatórios JSON por canal e consolidado
+│       └── orchestrator.py            # Orquestração multi-canal sequencial
 │
-├── tests/                             # ~230+ testes (unit + property-based)
-│   ├── test_*.py                      # Unit tests
-│   └── test_prop_*.py                 # Property-based tests (Hypothesis)
+├── tests/                             # ~355+ testes (unit + property-based)
+│   ├── test_*.py                      # Unit tests (PoC + Player Discovery)
+│   ├── test_prop_*.py                 # Property-based tests (Hypothesis)
+│   └── test_audio_subtitle_monitor/   # Testes do Audio/Subtitle Monitor (125 testes)
 │
 ├── scripts/
 │   ├── run_poc_ec2.sh                 # Script para rodar a PoC original
@@ -175,19 +184,30 @@ CHANNEL_MONITORING/
 
 **Status:** ✅ Implementado (58 tasks completas)
 
-### 3. Audio/Subtitle Monitoring (Em Desenvolvimento)
+### 3. Audio/Subtitle Monitoring
 
 **Objetivo:** Testar funcionalidades de áudio e legendas interagindo com a UI customizada do player SKY+.
 
-**Fluxo planejado:**
-1. Mover cursor sobre player (mostrar controles)
-2. Clicar no ícone de settings (último ícone na barra, parece fullscreen ⊞)
-3. Identificar seções "IDIOMA ALTERNATIVO" e "LEGENDAS"
-4. Iterar cada opção de áudio (30s de telemetria por track)
-5. Iterar cada opção de legenda (verificar cues ativas)
-6. Relatório por canal
+**Entry point:** `PYTHONPATH=. python3 -c "import asyncio; from src.audio_subtitle_monitor import run_audio_subtitle_monitoring; ..."`
 
-**Status:** 🚧 Requisitos definidos, aguardando design e implementação
+**Fluxo:**
+1. Mover cursor sobre player (mostrar controles)
+2. Clicar no ícone de settings via CapabilityMap (semantic_dom ou visual_fallback)
+3. Identificar seções "IDIOMA ALTERNATIVO" e "LEGENDAS"
+4. Iterar cada opção de áudio (selecionar UI → validar API → telemetria 30s)
+5. Iterar cada opção de legenda (selecionar UI → validar API → aguardar cue 15s)
+6. Restaurar tracks iniciais
+7. Relatório JSON por canal + consolidado multi-canal
+
+**Componentes:**
+- `SettingsDialogManager` — Abertura/fechamento dialog, descoberta/seleção de opções
+- `AudioMonitor` — Validação track switch via Shaka API + telemetria Web Audio API
+- `SubtitleMonitor` — Validação track switch + monitoramento cues TextTrack API
+- `ReportGenerator` — Relatórios JSON por canal e consolidado
+- `AudioSubtitleOrchestrator` — Orquestração multi-canal sequencial
+- `run_audio_subtitle_monitoring()` — Entry point com logging estruturado
+
+**Status:** ✅ Implementado (32 tasks completas, 125 testes passando)
 
 ---
 
@@ -259,6 +279,21 @@ PYTHONPATH=. python3 -m pytest tests/ -v
 | `PLAYER_DISCOVERY_LOG_LEVEL` | INFO | Nível de log (DEBUG, INFO, WARNING, ERROR) |
 | `PLAYER_DISCOVERY_OUTPUT_DIR` | ./output | Diretório de relatórios |
 | `CHROME_PROFILE_DIR` | /data/chrome-profile | Chrome profile com sessão autenticada |
+
+### Audio/Subtitle Monitor (prefixo `AUDIO_SUBTITLE_`)
+
+| Variável | Default | Descrição |
+|----------|---------|-----------|
+| `AUDIO_SUBTITLE_CHANNELS` | (vazio) | URLs separadas por vírgula |
+| `AUDIO_SUBTITLE_OUTPUT_DIR` | reports/ | Diretório de relatórios JSON |
+| `AUDIO_SUBTITLE_AUDIO_TELEMETRY_WINDOW_S` | 30.0 | Janela de coleta por track (segundos) |
+| `AUDIO_SUBTITLE_AUDIO_SAMPLE_INTERVAL_S` | 2.0 | Intervalo entre amostras |
+| `AUDIO_SUBTITLE_AUDIO_PASS_THRESHOLD` | 0.80 | Mínimo de amostras com áudio para PASS |
+| `AUDIO_SUBTITLE_AUDIO_RMS_THRESHOLD` | 0.01 | Limiar RMS para presença de áudio |
+| `AUDIO_SUBTITLE_SUBTITLE_CUE_TIMEOUT_S` | 15.0 | Timeout para cue de legenda |
+| `AUDIO_SUBTITLE_TRACK_SWITCH_TIMEOUT_S` | 5.0 | Timeout para confirmação de switch |
+| `AUDIO_SUBTITLE_PLAYBACK_WAIT_TIMEOUT_S` | 30.0 | Timeout para player iniciar |
+| `AUDIO_SUBTITLE_SETTINGS_DIALOG_TIMEOUT_S` | 5.0 | Timeout para Settings Dialog abrir |
 
 ---
 
@@ -395,4 +430,4 @@ dataclasses-json==0.6.4     # Serialização JSON de dataclasses
 
 1. **widevine-poc** — Validação DRM (✅ Concluída, GO)
 2. **player-discovery** — Descoberta dinâmica de capabilities (✅ 58/58 tasks)
-3. **audio-subtitle-monitoring** — Teste de áudio/legendas via UI (🚧 Requisitos prontos)
+3. **audio-subtitle-monitoring** — Teste de áudio/legendas via UI (✅ 32/32 tasks)
