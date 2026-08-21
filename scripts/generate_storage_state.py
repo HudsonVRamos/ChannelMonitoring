@@ -1,13 +1,7 @@
 """Script para gerar storageState da plataforma SKY+ e enviar ao S3.
 
-Fluxo:
-1. Abre browser Chromium com interface gráfica
-2. Navega para a página de login da SKY+
-3. Aguarda você fazer login manualmente
-4. Após login, navega para um canal ao vivo (para capturar cookies DRM)
-5. Exporta storageState.json com todos os cookies e localStorage
-6. Valida o arquivo gerado
-7. Faz upload para o S3
+Usa persistent context com perfil do Chrome para herdar sessão existente
+e evitar detecção de bot/captcha.
 
 Uso:
     python scripts/generate_storage_state.py
@@ -23,12 +17,11 @@ import json
 import os
 import sys
 
-# Adicionar raiz do projeto ao path para imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 
 # Configurações
 SKY_LOGIN_URL = "https://www.skymais.com.br/acessar"
+SKY_CHANNEL_URL = "https://www.skymais.com.br/player/live/CH0100000000124"
 S3_BUCKET = "widevine-poc-artifacts-us-east-1-761018874615"
 S3_KEY = "storage_state/state.json"
 AWS_REGION = "us-east-1"
@@ -36,41 +29,30 @@ OUTPUT_FILE = "storageState.json"
 
 
 def print_header():
-    """Imprime cabeçalho do script."""
     print()
     print("=" * 60)
     print("  Gerador de StorageState — SKY+ / Widevine PoC")
     print("=" * 60)
     print()
-    print("  Este script vai:")
-    print("  1. Abrir um browser Chromium")
-    print("  2. Navegar para a SKY+")
-    print("  3. Aguardar você fazer login")
-    print("  4. Exportar cookies e sessão")
-    print("  5. Fazer upload para o S3")
+    print("  IMPORTANTE: Feche TODAS as janelas do Chrome antes")
+    print("  de executar este script!")
+    print()
+    print("  O script vai abrir o Chrome usando seu perfil real")
+    print("  (com sessão já logada), navegar até o canal e")
+    print("  exportar os cookies.")
     print()
     print("=" * 60)
     print()
 
 
 def validate_storage_state(path: str) -> bool:
-    """Valida se o storageState gerado é válido.
-
-    Verifica:
-    - Arquivo existe e tamanho > 0
-    - JSON válido
-    - Contém array 'cookies' com ao menos um cookie
-
-    Returns:
-        True se válido.
-    """
     if not os.path.exists(path):
         print(f"  ✗ Arquivo não encontrado: {path}")
         return False
 
     size = os.path.getsize(path)
     if size == 0:
-        print(f"  ✗ Arquivo vazio (0 bytes)")
+        print(f"  ✗ Arquivo vazio")
         return False
 
     try:
@@ -81,159 +63,154 @@ def validate_storage_state(path: str) -> bool:
         return False
 
     cookies = data.get("cookies", [])
-    if not isinstance(cookies, list) or len(cookies) == 0:
-        print(f"  ✗ Nenhum cookie encontrado no storageState")
-        return False
+    origins = data.get("origins", [])
 
-    print(f"  ✓ Arquivo válido: {size} bytes, {len(cookies)} cookies")
+    print(f"  ✓ Arquivo válido: {size} bytes")
+    print(f"    Cookies: {len(cookies)}")
+    print(f"    Origins (localStorage): {len(origins)}")
 
-    # Mostrar domínios dos cookies capturados
-    domains = set(c.get("domain", "") for c in cookies)
-    for domain in sorted(domains):
-        count = sum(1 for c in cookies if c.get("domain") == domain)
-        print(f"    • {domain} ({count} cookies)")
+    # Verificar se tem dados de skymais
+    sky_cookies = [c for c in cookies if "skymais" in c.get("domain", "")]
+    print(f"    Cookies skymais: {len(sky_cookies)}")
 
-    return True
+    # Verificar localStorage
+    for origin in origins:
+        if "skymais" in origin.get("origin", ""):
+            ls = origin.get("localStorage", [])
+            print(f"    localStorage skymais: {len(ls)} entries")
+            # Procurar tokens
+            for item in ls:
+                name = item.get("name", "")
+                if any(k in name.lower() for k in ["token", "auth", "session", "user"]):
+                    value_preview = item.get("value", "")[:50]
+                    print(f"      → {name}: {value_preview}...")
+
+    return len(cookies) > 0 or len(origins) > 0
 
 
 def upload_to_s3(local_path: str) -> bool:
-    """Faz upload do storageState para o S3.
-
-    Returns:
-        True se upload bem-sucedido.
-    """
     try:
         import boto3
-
         print(f"\n  Uploading para s3://{S3_BUCKET}/{S3_KEY} ...")
-
         s3_client = boto3.client("s3", region_name=AWS_REGION)
         s3_client.upload_file(local_path, S3_BUCKET, S3_KEY)
-
         print(f"  ✓ Upload concluído!")
-        print(f"    Bucket: {S3_BUCKET}")
-        print(f"    Key: {S3_KEY}")
-        print(f"    Region: {AWS_REGION}")
         return True
-
-    except ImportError:
-        print("  ✗ boto3 não instalado. Instale com: pip install boto3")
-        print(f"  → Upload manual: aws s3 cp {local_path} s3://{S3_BUCKET}/{S3_KEY} --region {AWS_REGION}")
-        return False
     except Exception as e:
         print(f"  ✗ Falha no upload: {e}")
-        print(f"  → Upload manual: aws s3 cp {local_path} s3://{S3_BUCKET}/{S3_KEY} --region {AWS_REGION}")
+        print(f"  → Manual: aws s3 cp {local_path} s3://{S3_BUCKET}/{S3_KEY} --region {AWS_REGION}")
         return False
+
+
+def get_chrome_user_data_dir() -> str:
+    """Retorna o diretório de perfil padrão do Chrome no Windows."""
+    local_app_data = os.environ.get("LOCALAPPDATA", "")
+    chrome_dir = os.path.join(local_app_data, "Google", "Chrome", "User Data")
+    if os.path.exists(chrome_dir):
+        return chrome_dir
+    # Fallback
+    home = os.path.expanduser("~")
+    return os.path.join(home, "AppData", "Local", "Google", "Chrome", "User Data")
 
 
 async def generate_storage_state():
-    """Fluxo principal: abre browser, aguarda login, exporta sessão."""
+    """Abre Chrome com perfil real, navega e exporta storageState."""
     from playwright.async_api import async_playwright
 
-    print("  Abrindo browser Chrome do sistema (evita detecção de bot)...")
+    user_data_dir = get_chrome_user_data_dir()
+    print(f"  Chrome profile: {user_data_dir}")
+
+    if not os.path.exists(user_data_dir):
+        print(f"  ✗ Perfil do Chrome não encontrado!")
+        print(f"    Esperado em: {user_data_dir}")
+        print()
+        print("  Alternativa: faça login no Chrome normal primeiro,")
+        print("  depois rode este script.")
+        return False
+
+    print(f"  ✓ Perfil do Chrome encontrado")
+    print()
+    print("  FECHE O CHROME AGORA se estiver aberto!")
+    print()
+    input("  Pressione ENTER quando o Chrome estiver fechado... ")
     print()
 
     async with async_playwright() as p:
-        # Usar Chrome do sistema ao invés do Chromium do Playwright
-        # Isso evita detecção de bot/captcha
-        browser = await p.chromium.launch(
+        # Usar persistent context com o perfil do Chrome
+        # Isso herda todos os cookies e localStorage da sessão existente
+        context = await p.chromium.launch_persistent_context(
+            user_data_dir=user_data_dir,
+            channel="chrome",
             headless=False,
-            channel="chrome",  # Usa o Chrome instalado no sistema
             args=[
-                "--start-maximized",
+                "--no-sandbox",
                 "--disable-blink-features=AutomationControlled",
             ],
-        )
-
-        context = await browser.new_context(
             viewport={"width": 1920, "height": 1080},
             no_viewport=True,
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            ),
         )
 
-        page = await context.new_page()
+        page = context.pages[0] if context.pages else await context.new_page()
 
-        # Navegar para a SKY+
-        print(f"  Navegando para {SKY_LOGIN_URL} ...")
-        await page.goto(SKY_LOGIN_URL, wait_until="domcontentloaded")
+        # Navegar direto para o canal (já deve estar logado)
+        print(f"  Navegando para {SKY_CHANNEL_URL} ...")
+        await page.goto(SKY_CHANNEL_URL, wait_until="domcontentloaded")
+        await page.wait_for_timeout(5000)
 
-        print()
-        print("  ┌─────────────────────────────────────────────────┐")
-        print("  │                                                   │")
-        print("  │   Faça LOGIN na plataforma SKY+ no browser.      │")
-        print("  │                                                   │")
-        print("  │   Após logar, NAVEGUE até um CANAL AO VIVO       │")
-        print("  │   para garantir que os cookies de DRM sejam       │")
-        print("  │   capturados.                                     │")
-        print("  │                                                   │")
-        print("  │   Quando estiver pronto, volte aqui e             │")
-        print("  │   pressione ENTER.                                │")
-        print("  │                                                   │")
-        print("  └─────────────────────────────────────────────────┘")
-        print()
-
-        # Aguardar usuário fazer login
-        input("  → Pressione ENTER quando estiver logado e num canal ao vivo... ")
-
-        # Verificar URL atual
         current_url = page.url
-        print(f"\n  URL atual: {current_url}")
+        print(f"  URL atual: {current_url}")
+
+        # Verificar se está na tela de login
+        if "acessar" in current_url.lower() or "login" in current_url.lower():
+            print()
+            print("  ⚠ Você foi redirecionado para login!")
+            print("  Faça login agora no browser que abriu.")
+            print("  Depois navegue até um canal ao vivo.")
+            print()
+            input("  Pressione ENTER quando estiver logado e no canal... ")
+            await page.wait_for_timeout(2000)
 
         # Exportar storageState
         print(f"  Exportando storageState para {OUTPUT_FILE} ...")
         await context.storage_state(path=OUTPUT_FILE)
 
-        # Fechar browser
-        await browser.close()
+        # Fechar
+        await context.close()
 
-    print(f"  ✓ Browser fechado.")
-    print()
+    print(f"  ✓ StorageState exportado!")
+    return True
 
 
 def main():
-    """Entry point do script."""
     print_header()
 
-    # Verificar se Playwright está instalado
     try:
         import playwright  # noqa: F401
     except ImportError:
-        print("  ✗ Playwright não instalado.")
-        print("    Execute:")
-        print("      pip install playwright")
-        print("      playwright install chromium")
+        print("  ✗ Playwright não instalado: pip install playwright")
         sys.exit(1)
 
-    # Executar geração do storageState
-    asyncio.run(generate_storage_state())
+    success = asyncio.run(generate_storage_state())
+    if not success:
+        sys.exit(1)
 
-    # Validar arquivo gerado
+    print()
     print("  Validando storageState...")
     if not validate_storage_state(OUTPUT_FILE):
-        print("\n  ✗ StorageState inválido. Tente novamente.")
+        print("\n  ✗ StorageState inválido.")
         sys.exit(1)
 
-    # Perguntar se quer fazer upload para S3
     print()
     upload = input("  Fazer upload para S3? [S/n]: ").strip().lower()
-
     if upload in ("", "s", "sim", "y", "yes"):
         upload_to_s3(OUTPUT_FILE)
     else:
-        print(f"\n  Upload pulado. Arquivo salvo em: {OUTPUT_FILE}")
-        print(f"  Para upload manual:")
-        print(f"    aws s3 cp {OUTPUT_FILE} s3://{S3_BUCKET}/{S3_KEY} --region {AWS_REGION}")
+        print(f"\n  Arquivo salvo em: {OUTPUT_FILE}")
 
     print()
     print("=" * 60)
-    print("  Pronto! Agora pode executar a PoC:")
-    print(f"  aws codebuild start-build --project-name widevine-poc --region {AWS_REGION}")
+    print("  Pronto!")
     print("=" * 60)
-    print()
 
 
 if __name__ == "__main__":
