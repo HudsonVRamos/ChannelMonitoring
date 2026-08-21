@@ -15,3 +15,6 @@ pytest-asyncio==0.23.5
 
 # Property-based testing
 hypothesis==6.99.13
+
+# Serialização de dataclasses para JSON
+dataclasses-json==0.6.4
