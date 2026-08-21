@@ -100,7 +100,7 @@ class UnifiedOrchestrator:
         self._browser_context = browser_context
 
         # Estado do CapabilityMap
-        self._capability_map: dict | None = None
+        self._capability_map = None
         self._consecutive_failures: int = 0
 
         # Shutdown graceful
@@ -763,7 +763,7 @@ class UnifiedOrchestrator:
             extra={"session_id": session_id},
         )
 
-    async def _run_discovery(self, session_id: str) -> dict:
+    async def _run_discovery(self, session_id: str):
         """Executa discovery de capabilities do player.
 
         Tenta usar o DiscoveryEngine existente. Se não disponível,
@@ -773,7 +773,7 @@ class UnifiedOrchestrator:
             session_id: ID da sessão para logging.
 
         Returns:
-            Dicionário com capabilities descobertas.
+            CapabilityMap (objeto) ou dict placeholder.
         """
         try:
             from src.player_discovery.discovery.engine import DiscoveryEngine
@@ -786,13 +786,9 @@ class UnifiedOrchestrator:
                 extra={"session_id": session_id},
             )
 
-            # Converter para dict se necessário
-            if hasattr(capability_map, "to_dict"):
-                return capability_map.to_dict()
-            elif hasattr(capability_map, "__dict__"):
-                return vars(capability_map)
-            else:
-                return {"_raw": capability_map}
+            # Retorna o objeto CapabilityMap diretamente
+            # (SettingsDialogManager precisa de get_interaction_strategy())
+            return capability_map
 
         except ImportError:
             logger.warning(
@@ -868,7 +864,7 @@ class UnifiedOrchestrator:
 
         audio_tester = AudioTrackTester(
             page=self._page,
-            capability_map=self._capability_map or {},
+            capability_map=self._capability_map,
             config=self._config,
             telemetry_collector=telemetry_collector,
         )
@@ -1009,7 +1005,7 @@ class UnifiedOrchestrator:
 
         subtitle_tester = SubtitleTrackTester(
             page=self._page,
-            capability_map=self._capability_map or {},
+            capability_map=self._capability_map,
             config=self._config,
             telemetry_collector=telemetry_collector,
         )

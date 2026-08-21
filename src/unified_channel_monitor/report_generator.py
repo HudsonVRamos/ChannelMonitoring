@@ -232,7 +232,7 @@ class UnifiedReportGenerator:
 
         logger.info(
             "Relatório persistido",
-            extra={"filepath": str(filepath), "filename": filename},
+            extra={"filepath": str(filepath), "report_filename": filename},
         )
 
         return filepath
