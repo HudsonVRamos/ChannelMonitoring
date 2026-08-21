@@ -174,6 +174,68 @@ async def run_continuous(config: PlayerDiscoveryConfig, channels: list[str]) -> 
             await browser.close()
 
 
+async def run_setup(config: PlayerDiscoveryConfig, channels: list[str]) -> None:
+    """Abre Chrome e aguarda login manual. Ctrl+C para fechar.
+
+    Use este modo para autenticar no SKY+ pela primeira vez.
+    O profile será salvo e reutilizado nas execuções seguintes.
+
+    Args:
+        config: Configuração centralizada.
+        channels: Lista de URLs de canais (navega para o primeiro).
+    """
+    chrome_profile = os.environ.get("CHROME_PROFILE_DIR", os.path.expanduser("~/.config/google-chrome"))
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch_persistent_context(
+            user_data_dir=chrome_profile,
+            executable_path="/usr/bin/google-chrome",
+            headless=False,
+            timeout=300000,
+            args=[
+                "--autoplay-policy=no-user-gesture-required",
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-gpu",
+                "--disable-software-rasterizer",
+                "--disable-dev-shm-usage",
+                "--disable-extensions",
+                "--disable-background-networking",
+                "--disable-default-apps",
+                "--no-first-run",
+                "--disable-popup-blocking",
+                "--window-size=1920,1080",
+            ],
+            viewport={"width": 1920, "height": 1080},
+            ignore_default_args=["--enable-automation"],
+            ignore_https_errors=True,
+        )
+
+        page = browser.pages[0] if browser.pages else await browser.new_page()
+
+        # Navegar para o canal para acionar login
+        url = channels[0] if channels else "https://www.skymais.com.br"
+        logging.info("Navegando para: %s", url)
+        await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+
+        logging.info("")
+        logging.info("=" * 60)
+        logging.info("  MODO SETUP — Faça login no SKY+ manualmente")
+        logging.info("  O Chrome vai ficar aberto até você dar Ctrl+C")
+        logging.info("  Após logar, o profile será salvo automaticamente.")
+        logging.info("=" * 60)
+        logging.info("")
+
+        # Ficar aberto indefinidamente até Ctrl+C
+        try:
+            while True:
+                await asyncio.sleep(1)
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            logging.info("Setup finalizado. Profile salvo em: %s", chrome_profile)
+        finally:
+            await browser.close()
+
+
 def _save_reports(orchestrator: PlayerDiscoveryOrchestrator, output_dir: str) -> None:
     """Salva relatórios em JSON no diretório de saída.
 
@@ -236,9 +298,12 @@ def main() -> None:
 
     # Modo de execução
     continuous = "--continuous" in sys.argv or "-c" in sys.argv
+    setup_mode = "--setup" in sys.argv or "-s" in sys.argv
 
     try:
-        if continuous:
+        if setup_mode:
+            asyncio.run(run_setup(config, channels))
+        elif continuous:
             asyncio.run(run_continuous(config, channels))
         else:
             asyncio.run(run_single(config, channels))
