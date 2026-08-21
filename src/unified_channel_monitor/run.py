@@ -89,12 +89,28 @@ async def main() -> None:
         },
     )
 
-    # 5. Lançar Playwright persistent context
+    # 5. Lançar Playwright persistent context com Google Chrome real
+    # (necessário para Widevine DRM — Chromium bundled não tem CDM)
+    chrome_profile = config.chrome_profile_dir or "/data/chrome-profile"
     try:
         async with async_playwright() as p:
             browser = await p.chromium.launch_persistent_context(
-                config.chrome_profile_dir,
+                user_data_dir=chrome_profile,
+                executable_path="/usr/bin/google-chrome",
                 headless=False,
+                timeout=300000,
+                args=[
+                    "--autoplay-policy=no-user-gesture-required",
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-extensions",
+                    "--disable-background-networking",
+                    "--disable-default-apps",
+                    "--no-first-run",
+                    "--disable-popup-blocking",
+                ],
+                viewport=None,
+                ignore_default_args=["--enable-automation"],
             )
 
             # Obter ou criar página
@@ -105,11 +121,10 @@ async def main() -> None:
             )
 
             logger.info(
-                "Browser Playwright lançado com sucesso",
+                "Google Chrome lançado com Widevine CDM",
                 extra={
-                    "chrome_profile_dir": (
-                        config.chrome_profile_dir
-                    ),
+                    "chrome_profile_dir": chrome_profile,
+                    "executable": "/usr/bin/google-chrome",
                     "pages_count": len(browser.pages),
                 },
             )
