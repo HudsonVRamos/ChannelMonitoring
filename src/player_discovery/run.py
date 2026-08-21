@@ -52,26 +52,28 @@ async def run_single(config: PlayerDiscoveryConfig, channels: list[str]) -> None
 
     async with async_playwright() as p:
         # Lançar Chrome real com perfil persistente (para DRM/Widevine)
+        # ignore_default_args remove flag de automação que invalida sessão
         browser = await p.chromium.launch_persistent_context(
             user_data_dir=chrome_profile,
-            channel="chrome",  # Usa Chrome instalado no sistema
-            headless=False,  # Chrome precisa de display (Xvfb)
+            executable_path="/usr/bin/google-chrome",
+            headless=False,
+            timeout=300000,
             args=[
+                "--autoplay-policy=no-user-gesture-required",
                 "--no-sandbox",
+                "--disable-setuid-sandbox",
                 "--disable-gpu",
                 "--disable-software-rasterizer",
                 "--disable-dev-shm-usage",
-                "--disable-blink-features=AutomationControlled",
-                "--disable-infobars",
-                "--window-size=1920,1080",
-                "--start-maximized",
                 "--disable-extensions",
                 "--disable-background-networking",
-                "--disable-sync",
-                "--no-first-run",
                 "--disable-default-apps",
+                "--no-first-run",
+                "--disable-popup-blocking",
+                "--window-size=1920,1080",
             ],
             viewport={"width": 1920, "height": 1080},
+            ignore_default_args=["--enable-automation"],
             ignore_https_errors=True,
         )
 
@@ -120,24 +122,25 @@ async def run_continuous(config: PlayerDiscoveryConfig, channels: list[str]) -> 
     async with async_playwright() as p:
         browser = await p.chromium.launch_persistent_context(
             user_data_dir=chrome_profile,
-            channel="chrome",
+            executable_path="/usr/bin/google-chrome",
             headless=False,
+            timeout=300000,
             args=[
+                "--autoplay-policy=no-user-gesture-required",
                 "--no-sandbox",
+                "--disable-setuid-sandbox",
                 "--disable-gpu",
                 "--disable-software-rasterizer",
                 "--disable-dev-shm-usage",
-                "--disable-blink-features=AutomationControlled",
-                "--disable-infobars",
-                "--window-size=1920,1080",
-                "--start-maximized",
                 "--disable-extensions",
                 "--disable-background-networking",
-                "--disable-sync",
-                "--no-first-run",
                 "--disable-default-apps",
+                "--no-first-run",
+                "--disable-popup-blocking",
+                "--window-size=1920,1080",
             ],
             viewport={"width": 1920, "height": 1080},
+            ignore_default_args=["--enable-automation"],
             ignore_https_errors=True,
         )
 
