@@ -67,7 +67,7 @@ async def run_single(config: PlayerDiscoveryConfig, channels: list[str]) -> None
                 "--no-first-run",
                 "--disable-popup-blocking",
             ],
-            viewport={"width": 1920, "height": 1080},
+            viewport=None,
             ignore_default_args=["--enable-automation"],
         )
 
@@ -129,7 +129,7 @@ async def run_continuous(config: PlayerDiscoveryConfig, channels: list[str]) -> 
                 "--no-first-run",
                 "--disable-popup-blocking",
             ],
-            viewport={"width": 1920, "height": 1080},
+            viewport=None,
             ignore_default_args=["--enable-automation"],
         )
 
@@ -191,7 +191,7 @@ async def run_setup(config: PlayerDiscoveryConfig, channels: list[str]) -> None:
                 "--no-first-run",
                 "--disable-popup-blocking",
             ],
-            viewport={"width": 1920, "height": 1080},
+            viewport=None,
             ignore_default_args=["--enable-automation"],
         )
 
