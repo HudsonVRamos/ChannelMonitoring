@@ -159,13 +159,22 @@ class PoCOrchestrator:
                             user_data_dir=chrome_profile,
                             executable_path="/usr/bin/google-chrome",
                             headless=False,
+                            timeout=300000,
                             args=[
                                 "--autoplay-policy="
                                 "no-user-gesture-required",
                                 "--no-sandbox",
                                 "--disable-setuid-sandbox",
+                                "--disable-extensions",
+                                "--disable-background-networking",
+                                "--disable-default-apps",
+                                "--no-first-run",
+                                "--disable-popup-blocking",
                             ],
                             viewport={"width": 1920, "height": 1080},
+                            ignore_default_args=[
+                                "--enable-automation",
+                            ],
                         )
                     )
                     self._page = (
