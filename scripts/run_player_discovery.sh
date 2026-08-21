@@ -54,7 +54,7 @@ fi
 echo "[3/5] Configurando variáveis de ambiente..."
 
 # Diretório do Chrome profile com sessão autenticada
-export CHROME_PROFILE_DIR="${CHROME_PROFILE_DIR:-/data/chrome-profile}"
+export CHROME_PROFILE_DIR="${CHROME_PROFILE_DIR:-/home/ubuntu/.config/google-chrome}"
 
 # Configurações do Player Discovery (podem ser overridados externamente)
 export PLAYER_DISCOVERY_OBSERVATION_PERIOD_S="${PLAYER_DISCOVERY_OBSERVATION_PERIOD_S:-30}"

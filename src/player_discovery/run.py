@@ -47,7 +47,7 @@ async def run_single(config: PlayerDiscoveryConfig, channels: list[str]) -> None
         config: Configuração centralizada.
         channels: Lista de URLs de canais.
     """
-    chrome_profile = os.environ.get("CHROME_PROFILE_DIR", "/data/chrome-profile")
+    chrome_profile = os.environ.get("CHROME_PROFILE_DIR", os.path.expanduser("~/.config/google-chrome"))
     output_dir = os.environ.get("PLAYER_DISCOVERY_OUTPUT_DIR", "./output")
 
     async with async_playwright() as p:
@@ -114,7 +114,7 @@ async def run_continuous(config: PlayerDiscoveryConfig, channels: list[str]) -> 
         config: Configuração centralizada.
         channels: Lista de URLs de canais.
     """
-    chrome_profile = os.environ.get("CHROME_PROFILE_DIR", "/data/chrome-profile")
+    chrome_profile = os.environ.get("CHROME_PROFILE_DIR", os.path.expanduser("~/.config/google-chrome"))
     output_dir = os.environ.get("PLAYER_DISCOVERY_OUTPUT_DIR", "./output")
 
     async with async_playwright() as p:
