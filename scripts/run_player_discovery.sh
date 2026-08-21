@@ -37,14 +37,26 @@ echo "[1/5] Limpando processos Chrome anteriores..."
 pkill -f "chrome" 2>/dev/null || true
 sleep 2
 
-# --- 2. Garantir que Xvfb está rodando ---
-echo "[2/5] Verificando display virtual (Xvfb)..."
-if ! pgrep -x Xvfb > /dev/null; then
-    echo "  Iniciando Xvfb :99..."
-    Xvfb :99 -screen 0 1920x1080x24 &
-    sleep 1
+# --- 2. Configurar display ---
+echo "[2/5] Configurando display..."
+
+# Se DISPLAY já está definido externamente, usar esse
+if [ -n "$DISPLAY" ]; then
+    echo "  Usando display existente: $DISPLAY"
+# Se VNC está rodando (:1), usar o VNC para que Chrome seja visível
+elif pgrep -f "Xvnc.*:1" > /dev/null 2>&1 || pgrep -f "vncserver" > /dev/null 2>&1; then
+    export DISPLAY=:1
+    echo "  VNC detectado — usando DISPLAY=:1 (Chrome visível no VNC)"
+# Senão, usar Xvfb (headless puro)
+else
+    if ! pgrep -x Xvfb > /dev/null; then
+        echo "  Iniciando Xvfb :99..."
+        Xvfb :99 -screen 0 1920x1080x24 &
+        sleep 1
+    fi
+    export DISPLAY=:99
+    echo "  Usando Xvfb headless: DISPLAY=:99"
 fi
-export DISPLAY=:99
 
 # --- 3. Configurar variáveis de ambiente ---
 echo "[3/5] Configurando variáveis de ambiente..."
