@@ -375,6 +375,9 @@ class PoCOrchestrator:
                 wait_until="domcontentloaded",
             )
 
+            # Aguardar renderização completa do JS
+            await self._page.wait_for_timeout(3000)
+
             # Verificar se foi redirecionado para login
             session_expired = (
                 await self._auth_manager.detect_session_expired(

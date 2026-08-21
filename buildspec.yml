@@ -7,6 +7,9 @@ env:
   variables:
     POC_OUTPUT_DIR: "./output"
     POC_STORAGE_STATE_PATH: "storage_state/state.json"
+    POC_DRM_TIMEOUT: "60"
+    POC_TELEMETRY_DURATION: "10"
+    POC_PLAYBACK_TIMEOUT: "60"
     ARTIFACTS_BUCKET: "widevine-poc-artifacts-us-east-1-761018874615"
 
 phases:
