@@ -47,12 +47,11 @@ async def run_single(config: PlayerDiscoveryConfig, channels: list[str]) -> None
         config: Configuração centralizada.
         channels: Lista de URLs de canais.
     """
-    chrome_profile = os.environ.get("CHROME_PROFILE_DIR", os.path.expanduser("~/.config/google-chrome"))
+    chrome_profile = os.environ.get("CHROME_PROFILE_DIR", "/data/chrome-profile")
     output_dir = os.environ.get("PLAYER_DISCOVERY_OUTPUT_DIR", "./output")
 
     async with async_playwright() as p:
-        # Lançar Chrome real com perfil persistente (para DRM/Widevine)
-        # ignore_default_args remove flag de automação que invalida sessão
+        # Idêntico à PoC (poc_orchestrator.py) que funciona
         browser = await p.chromium.launch_persistent_context(
             user_data_dir=chrome_profile,
             executable_path="/usr/bin/google-chrome",
@@ -62,19 +61,14 @@ async def run_single(config: PlayerDiscoveryConfig, channels: list[str]) -> None
                 "--autoplay-policy=no-user-gesture-required",
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
-                "--disable-gpu",
-                "--disable-software-rasterizer",
-                "--disable-dev-shm-usage",
                 "--disable-extensions",
                 "--disable-background-networking",
                 "--disable-default-apps",
                 "--no-first-run",
                 "--disable-popup-blocking",
-                "--window-size=1920,1080",
             ],
             viewport={"width": 1920, "height": 1080},
             ignore_default_args=["--enable-automation"],
-            ignore_https_errors=True,
         )
 
         page = browser.pages[0] if browser.pages else await browser.new_page()
@@ -116,7 +110,7 @@ async def run_continuous(config: PlayerDiscoveryConfig, channels: list[str]) -> 
         config: Configuração centralizada.
         channels: Lista de URLs de canais.
     """
-    chrome_profile = os.environ.get("CHROME_PROFILE_DIR", os.path.expanduser("~/.config/google-chrome"))
+    chrome_profile = os.environ.get("CHROME_PROFILE_DIR", "/data/chrome-profile")
     output_dir = os.environ.get("PLAYER_DISCOVERY_OUTPUT_DIR", "./output")
 
     async with async_playwright() as p:
@@ -129,19 +123,14 @@ async def run_continuous(config: PlayerDiscoveryConfig, channels: list[str]) -> 
                 "--autoplay-policy=no-user-gesture-required",
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
-                "--disable-gpu",
-                "--disable-software-rasterizer",
-                "--disable-dev-shm-usage",
                 "--disable-extensions",
                 "--disable-background-networking",
                 "--disable-default-apps",
                 "--no-first-run",
                 "--disable-popup-blocking",
-                "--window-size=1920,1080",
             ],
             viewport={"width": 1920, "height": 1080},
             ignore_default_args=["--enable-automation"],
-            ignore_https_errors=True,
         )
 
         page = browser.pages[0] if browser.pages else await browser.new_page()
@@ -184,7 +173,7 @@ async def run_setup(config: PlayerDiscoveryConfig, channels: list[str]) -> None:
         config: Configuração centralizada.
         channels: Lista de URLs de canais (navega para o primeiro).
     """
-    chrome_profile = os.environ.get("CHROME_PROFILE_DIR", os.path.expanduser("~/.config/google-chrome"))
+    chrome_profile = os.environ.get("CHROME_PROFILE_DIR", "/data/chrome-profile")
 
     async with async_playwright() as p:
         browser = await p.chromium.launch_persistent_context(
@@ -196,19 +185,14 @@ async def run_setup(config: PlayerDiscoveryConfig, channels: list[str]) -> None:
                 "--autoplay-policy=no-user-gesture-required",
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
-                "--disable-gpu",
-                "--disable-software-rasterizer",
-                "--disable-dev-shm-usage",
                 "--disable-extensions",
                 "--disable-background-networking",
                 "--disable-default-apps",
                 "--no-first-run",
                 "--disable-popup-blocking",
-                "--window-size=1920,1080",
             ],
             viewport={"width": 1920, "height": 1080},
             ignore_default_args=["--enable-automation"],
-            ignore_https_errors=True,
         )
 
         page = browser.pages[0] if browser.pages else await browser.new_page()
