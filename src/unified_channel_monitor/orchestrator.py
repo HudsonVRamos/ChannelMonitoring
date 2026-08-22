@@ -829,36 +829,18 @@ class UnifiedOrchestrator:
     def _get_dialog_capability_map(self):
         """Retorna CapabilityMap adaptado para o SettingsDialogManager.
 
-        O SettingsDialogManager precisa de um objeto com
-        get_interaction_strategy() e get_capability(). Se o
-        CapabilityMap real não tem a capability 'settings' confirmada
-        (behavioral test retorna False), usamos um mock que força
-        o fallback heurístico (semantic_dom) — que é o que funciona
-        no player SKY+.
+        O SettingsDialogManager funciona melhor com fallback heurístico
+        (semantic_dom) no player SKY+. O DiscoveryEngine marca settings
+        como disponível via player_api, mas isso não ajuda a abrir o
+        painel visual — precisa de clique no ícone via DOM.
+
+        Usa mock com get_interaction_strategy=None para forçar o
+        fallback heurístico, que é o mesmo approach do
+        audio_subtitle_monitor/run.py que funciona em produção.
 
         Returns:
-            CapabilityMap real se settings está confirmado,
-            ou mock com heurísticas se não.
+            Mock com heurísticas que funciona com o player SKY+.
         """
-        if self._capability_map is None:
-            from unittest.mock import MagicMock
-            cm = MagicMock()
-            cm.get_interaction_strategy.return_value = None
-            cm.get_capability.return_value = None
-            cm.is_valid.return_value = True
-            return cm
-
-        # Verificar se o CapabilityMap real confirma 'settings'
-        try:
-            settings_cap = self._capability_map.get_capability("settings")
-            if settings_cap and getattr(settings_cap, "available", False):
-                # Settings confirmado — usar CapabilityMap real
-                return self._capability_map
-        except (AttributeError, TypeError):
-            pass
-
-        # Settings não confirmado — usar mock com heurísticas
-        # (mesma abordagem do audio_subtitle_monitor/run.py)
         from unittest.mock import MagicMock
         cm = MagicMock()
         cm.get_interaction_strategy.return_value = None
